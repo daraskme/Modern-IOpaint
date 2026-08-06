@@ -5,7 +5,7 @@ import shutil
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import Dict, List, Mapping, Optional, Tuple
 
 if os.name == "nt":
     # Hub snapshots can share blobs across repositories. Avoid privileged
@@ -20,6 +20,7 @@ from modern_iopaint.const import (
     DIFFUSERS_SD_INPAINT_CLASS_NAME,
     DIFFUSERS_SDXL_CLASS_NAME,
     DIFFUSERS_SDXL_INPAINT_CLASS_NAME,
+    FLUX_FILL_NAME,
 )
 from modern_iopaint.schema import ModelInfo, ModelType
 from modern_iopaint.model.original_sd_configs import load_original_config
@@ -35,7 +36,37 @@ QUARANTINED_MODEL_NAME_PARTS = ("anytext", "brushnet", "powerpaint")
 QWEN_PRECISION_ENV = "MODERN_IOPAINT_QWEN_PRECISION"
 QWEN_RANK_ENV = "MODERN_IOPAINT_QWEN_RANK"
 QWEN_LIGHTNING_STEPS_ENV = "MODERN_IOPAINT_QWEN_LIGHTNING_STEPS"
+FLUX_PRECISION_ENV = "MODERN_IOPAINT_FLUX_PRECISION"
+BFL_FLUX_FILL_REPO = "black-forest-labs/FLUX.1-Fill-dev"
+BFL_FLUX_FILL_MODEL_URL = "https://huggingface.co/black-forest-labs/FLUX.1-Fill-dev"
 _nunchaku_error_logged = False
+
+
+class FluxAccessError(RuntimeError):
+    """Actionable access failure for the gated FLUX.1-Fill base repository."""
+
+    code = "flux_access_required"
+
+    def __init__(self, cause: Exception, *, offline: bool = False):
+        self.repo_id = BFL_FLUX_FILL_REPO
+        self.model_url = BFL_FLUX_FILL_MODEL_URL
+        self.offline = offline
+        self.status_code = 403
+        detail = (
+            "Access could not be checked while HF_HUB_OFFLINE=1. "
+            if offline
+            else "Hugging Face denied access to the gated repository. "
+        )
+        super().__init__(
+            "FLUX.1-Fill-dev access is required. "
+            f"{detail}"
+            "To continue: (a) create or log into a Hugging Face account; "
+            f"(b) accept the FLUX.1-dev license on {self.model_url}; and "
+            "(c) provide an authorized token with `huggingface-cli login` "
+            "(or `hf auth login`) or the HF_TOKEN environment variable. "
+            "Modern-IOPaint will not bypass repository gating. "
+            f"Original error: {cause}"
+        )
 
 
 @dataclass(frozen=True)
@@ -47,6 +78,7 @@ class ManifestModelArtifacts:
     transformer_filename: str
     transformer_path: Path
     base_path: Path
+    optional_component_paths: Mapping[str, Path]
 
 
 def get_model_root(cache_dir: Optional[Path] = None) -> Path:
@@ -77,27 +109,54 @@ def get_hf_cache_dir(cache_dir: Optional[Path] = None) -> Path:
 
 
 def resolve_qwen_precision(precision: Optional[str]) -> str:
-    env_precision = os.getenv(QWEN_PRECISION_ENV)
+    return _resolve_nunchaku_precision(
+        precision,
+        env_name=QWEN_PRECISION_ENV,
+        backend_name="Qwen",
+        option_name="qwen-precision",
+    )
+
+
+def _resolve_nunchaku_precision(
+    precision: Optional[str],
+    *,
+    env_name: str,
+    backend_name: str,
+    option_name: str,
+) -> str:
+    env_precision = os.getenv(env_name)
     if env_precision and (not precision or precision == "auto"):
         precision = env_precision
     precision = str(precision or "auto").lower()
     if precision in ("int4", "fp4"):
         return precision
     if precision != "auto":
-        raise ValueError("Qwen precision must be one of: auto, int4, fp4")
+        raise ValueError(
+            f"{backend_name} precision must be one of: auto, int4, fp4"
+        )
     try:
         from nunchaku.utils import get_precision
 
         detected = get_precision()
     except Exception as error:
         raise RuntimeError(
-            "Qwen precision auto-detection requires a working nunchaku==1.2.1 "
+            f"{backend_name} precision auto-detection requires a working "
+            "nunchaku==1.2.1 "
             "installation and CUDA GPU. Install Nunchaku separately or pass "
-            "--qwen-precision int4/fp4."
+            f"--{option_name} int4/fp4."
         ) from error
     if detected not in ("int4", "fp4"):
         raise RuntimeError(f"Nunchaku returned unsupported precision {detected!r}")
     return detected
+
+
+def resolve_flux_precision(precision: Optional[str]) -> str:
+    return _resolve_nunchaku_precision(
+        precision,
+        env_name=FLUX_PRECISION_ENV,
+        backend_name="FLUX",
+        option_name="flux-precision",
+    )
 
 
 def normalize_qwen_rank(rank: Optional[str]) -> str:
@@ -131,16 +190,103 @@ def _snapshot_download(
 ) -> Path:
     from huggingface_hub import snapshot_download
 
-    return Path(
-        snapshot_download(
-            repo_id=spec.repo,
-            revision=spec.revision,
-            cache_dir=str(cache_dir),
-            allow_patterns=list(allow_patterns),
-            ignore_patterns=list(spec.ignore_patterns),
-            local_files_only=local_files_only,
+    try:
+        return Path(
+            snapshot_download(
+                repo_id=spec.repo,
+                revision=spec.revision,
+                cache_dir=str(cache_dir),
+                allow_patterns=list(allow_patterns),
+                ignore_patterns=list(spec.ignore_patterns),
+                local_files_only=local_files_only,
+            )
         )
-    )
+    except Exception as error:
+        if spec.repo != BFL_FLUX_FILL_REPO:
+            raise
+
+        from huggingface_hub.errors import GatedRepoError, HfHubHTTPError
+
+        response = getattr(error, "response", None)
+        status_code = getattr(response, "status_code", None)
+        offline = os.getenv("HF_HUB_OFFLINE", "").strip().lower() in (
+            "1",
+            "on",
+            "true",
+            "yes",
+        )
+        if (
+            isinstance(error, GatedRepoError)
+            or (isinstance(error, HfHubHTTPError) and status_code in (401, 403))
+            or status_code in (401, 403)
+            or offline
+        ):
+            raise FluxAccessError(error, offline=offline) from error
+        raise
+
+
+def _select_manifest_options(
+    record: ModelManifestRecord,
+    *,
+    precision: str,
+    rank: str,
+    lightning_steps: int,
+) -> Tuple[str, str, int]:
+    if record.name == FLUX_FILL_NAME:
+        selected_precision = resolve_flux_precision(precision)
+    else:
+        selected_precision = resolve_qwen_precision(precision)
+    selected_rank = normalize_qwen_rank(rank)
+    selected_steps = normalize_qwen_lightning_steps(lightning_steps)
+
+    # Shared P2 callers carry Qwen's r32/lightning-8 defaults. A manifest
+    # backend with a single supported value selects that value without making
+    # those callers know about backend-specific rank/lightning shapes.
+    if selected_rank not in record.ranks and len(record.ranks) == 1:
+        selected_rank = record.ranks[0]
+    if selected_steps not in record.lightning_steps and len(record.lightning_steps) == 1:
+        selected_steps = record.lightning_steps[0]
+
+    # filename() supplies the manifest-specific validation errors.
+    record.filename(selected_precision, selected_rank, selected_steps)
+    return selected_precision, selected_rank, selected_steps
+
+
+def _optional_component_path(root: Path, spec: DownloadSpec) -> Optional[Path]:
+    exact_patterns = [
+        pattern
+        for pattern in spec.allow_patterns
+        if not any(character in pattern for character in "*?[")
+    ]
+    if len(exact_patterns) == 1:
+        candidate = root / exact_patterns[0]
+        return candidate if candidate.is_file() else None
+    return root
+
+
+def _resolve_optional_components(
+    record: ModelManifestRecord,
+    hub_cache: Path,
+    *,
+    local_files_only: bool,
+) -> Dict[str, Path]:
+    paths: Dict[str, Path] = {}
+    for name, spec in record.optional_components.items():
+        try:
+            root = _snapshot_download(
+                spec,
+                hub_cache,
+                allow_patterns=spec.allow_patterns,
+                local_files_only=local_files_only,
+            )
+        except Exception:
+            if local_files_only:
+                continue
+            raise
+        component_path = _optional_component_path(root, spec)
+        if component_path is not None:
+            paths[name] = component_path
+    return paths
 
 
 def resolve_manifest_model_artifacts(
@@ -152,9 +298,12 @@ def resolve_manifest_model_artifacts(
     cache_dir: Optional[Path] = None,
 ) -> ManifestModelArtifacts:
     record = load_model_manifest().get(model)
-    selected_precision = resolve_qwen_precision(precision)
-    selected_rank = normalize_qwen_rank(rank)
-    selected_steps = normalize_qwen_lightning_steps(lightning_steps)
+    selected_precision, selected_rank, selected_steps = _select_manifest_options(
+        record,
+        precision=precision,
+        rank=rank,
+        lightning_steps=lightning_steps,
+    )
     filename = record.filename(selected_precision, selected_rank, selected_steps)
     hub_cache = get_hf_cache_dir(cache_dir)
 
@@ -175,9 +324,9 @@ def resolve_manifest_model_artifacts(
     transformer_path = transformer_root / filename
     if not transformer_path.is_file():
         raise FileNotFoundError(
-            f"Qwen transformer is not present in the local Hub cache: "
+            f"Nunchaku transformer is not present in the local Hub cache: "
             f"{transformer_path}. Run `modern-iopaint download --model {model}` "
-            "with the same Qwen precision/rank/lightning options first."
+            "with the same precision option first."
         )
     return ManifestModelArtifacts(
         record=record,
@@ -187,6 +336,9 @@ def resolve_manifest_model_artifacts(
         transformer_filename=filename,
         transformer_path=transformer_path,
         base_path=base_root,
+        optional_component_paths=_resolve_optional_components(
+            record, hub_cache, local_files_only=True
+        ),
     )
 
 
@@ -241,9 +393,12 @@ def download_manifest_model(
     cache_dir: Optional[Path] = None,
 ) -> ManifestModelArtifacts:
     record = load_model_manifest().get(model)
-    selected_precision = resolve_qwen_precision(precision)
-    selected_rank = normalize_qwen_rank(rank)
-    selected_steps = normalize_qwen_lightning_steps(lightning_steps)
+    selected_precision, selected_rank, selected_steps = _select_manifest_options(
+        record,
+        precision=precision,
+        rank=rank,
+        lightning_steps=lightning_steps,
+    )
     filename = record.filename(selected_precision, selected_rank, selected_steps)
     hub_cache = get_hf_cache_dir(cache_dir)
 
@@ -254,49 +409,76 @@ def download_manifest_model(
         lightning_steps=selected_steps,
         cache_dir=cache_dir,
     ):
-        logger.info(
-            "Manifest model {} ({}/{}/{}) is already downloaded",
-            model,
-            selected_precision,
-            selected_rank,
-            selected_steps,
-        )
-        return resolve_manifest_model_artifacts(
+        artifacts = resolve_manifest_model_artifacts(
             model,
             precision=selected_precision,
             rank=selected_rank,
             lightning_steps=selected_steps,
             cache_dir=cache_dir,
         )
+        missing_optional = set(record.optional_components) - set(
+            artifacts.optional_component_paths
+        )
+        if not missing_optional:
+            logger.info(
+                "Manifest model {} ({}/{}/{}) is already downloaded",
+                model,
+                selected_precision,
+                selected_rank,
+                selected_steps,
+            )
+            return artifacts
+        logger.info(
+            "Manifest model {} core components are cached; downloading missing "
+            "optional components: {}",
+            model,
+            sorted(missing_optional),
+        )
 
     _preflight_disk_space(record, hub_cache)
-    logger.info(
-        "Downloading {} transformer {} from {} at revision {}",
-        model,
-        filename,
-        record.repo,
-        record.revision,
-    )
-    transformer_root = _snapshot_download(
-        record,
-        hub_cache,
-        allow_patterns=record.transformer_allow_patterns(
-            selected_precision, selected_rank, selected_steps
-        ),
-        local_files_only=False,
-    )
-    logger.info(
-        "Downloading {} base components from {} at revision {} "
-        "(transformer/* excluded)",
-        model,
-        record.base.repo,
-        record.base.revision,
-    )
-    base_root = _snapshot_download(
-        record.base,
-        hub_cache,
-        allow_patterns=record.base.allow_patterns,
-        local_files_only=False,
+    def download_transformer() -> Path:
+        logger.info(
+            "Downloading {} transformer {} from {} at revision {}",
+            model,
+            filename,
+            record.repo,
+            record.revision,
+        )
+        return _snapshot_download(
+            record,
+            hub_cache,
+            allow_patterns=record.transformer_allow_patterns(
+                selected_precision, selected_rank, selected_steps
+            ),
+            local_files_only=False,
+        )
+
+    def download_base() -> Path:
+        logger.info(
+            "Downloading {} base components from {} at revision {} "
+            "(transformer/* excluded)",
+            model,
+            record.base.repo,
+            record.base.revision,
+        )
+        return _snapshot_download(
+            record.base,
+            hub_cache,
+            allow_patterns=record.base.allow_patterns,
+            local_files_only=False,
+        )
+
+    # Check gated access before spending time on the separate quantized
+    # transformer snapshot.
+    if record.base.gated:
+        base_root = download_base()
+        transformer_root = download_transformer()
+    else:
+        transformer_root = download_transformer()
+        base_root = download_base()
+
+    optional_component_paths = _resolve_optional_components(
+        record, hub_cache, local_files_only=False
     )
     transformer_path = transformer_root / filename
     if not transformer_path.is_file():
@@ -312,6 +494,7 @@ def download_manifest_model(
         transformer_filename=filename,
         transformer_path=transformer_path,
         base_path=base_root,
+        optional_component_paths=optional_component_paths,
     )
 
 
@@ -568,13 +751,15 @@ def _nunchaku_is_available() -> bool:
     global _nunchaku_error_logged
     try:
         from nunchaku import NunchakuQwenImageTransformer2DModel  # noqa: F401
+        from nunchaku import NunchakuFluxTransformer2dModel  # noqa: F401
+        from nunchaku import NunchakuT5EncoderModel  # noqa: F401
         from nunchaku.utils import get_precision  # noqa: F401
 
         return True
     except Exception as error:
         if not _nunchaku_error_logged:
             logger.warning(
-                "Qwen models are hidden because Nunchaku could not be imported: {}. "
+                "Nunchaku models are hidden because Nunchaku could not be imported: {}. "
                 "Install nunchaku==1.2.1 separately in this environment; LaMa, "
                 "SD, and SDXL remain available.",
                 error,
@@ -589,6 +774,7 @@ def scan_manifest_models(
     qwen_precision: str = "auto",
     qwen_rank: str = "r32",
     qwen_lightning_steps: int = 8,
+    flux_precision: str = "auto",
 ) -> List[ModelInfo]:
     if not _nunchaku_is_available():
         return []
@@ -607,11 +793,32 @@ def scan_manifest_models(
 
     available_models = []
     for name in integrated_model_names():
+        record = load_model_manifest().get(name)
+        if name == FLUX_FILL_NAME:
+            try:
+                model_precision = resolve_flux_precision(flux_precision)
+            except Exception as error:
+                logger.warning(
+                    "FLUX Fill is hidden because its precision could not be "
+                    "resolved: {}",
+                    error,
+                )
+                continue
+            model_rank = "r32"
+            model_lightning_steps = 0
+            default_steps = 28
+            default_guidance_scale = 30.0
+        else:
+            model_precision = precision
+            model_rank = rank
+            model_lightning_steps = lightning_steps
+            default_steps = lightning_steps or 50
+            default_guidance_scale = 1.0
         if not is_manifest_model_downloaded(
             name,
-            precision=precision,
-            rank=rank,
-            lightning_steps=lightning_steps,
+            precision=model_precision,
+            rank=model_rank,
+            lightning_steps=model_lightning_steps,
             cache_dir=cache_dir,
         ):
             continue
@@ -620,8 +827,11 @@ def scan_manifest_models(
                 name=name,
                 path=name,
                 model_type=ModelType.DIFFUSERS_OTHER,
-                default_steps=lightning_steps or 50,
-                default_guidance_scale=1.0,
+                default_steps=default_steps,
+                default_guidance_scale=default_guidance_scale,
+                license_name=record.license_name,
+                license_url=record.license_url,
+                gated=record.base.gated,
             )
         )
     return available_models
@@ -689,6 +899,7 @@ def scan_models(
     qwen_precision: str = "auto",
     qwen_rank: str = "r32",
     qwen_lightning_steps: int = 8,
+    flux_precision: str = "auto",
 ) -> List[ModelInfo]:
     model_dir = get_model_root(cache_dir)
     available_models = []
@@ -702,6 +913,7 @@ def scan_models(
             qwen_precision=qwen_precision,
             qwen_rank=qwen_rank,
             qwen_lightning_steps=qwen_lightning_steps,
+            flux_precision=flux_precision,
         )
     )
     return [

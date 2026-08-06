@@ -43,6 +43,9 @@ from modern_iopaint.helper import (
 )
 from modern_iopaint.model.utils import torch_gc
 from modern_iopaint.model_manager import ModelManager
+from modern_iopaint.const import FLUX_FILL_NAME
+from modern_iopaint.license_settings import is_license_accepted, set_license_accepted
+from modern_iopaint.model_manifest import load_model_manifest
 from modern_iopaint.plugins import build_plugins, RealESRGANUpscaler, InteractiveSeg
 from modern_iopaint.plugins.base_plugin import BasePlugin
 from modern_iopaint.plugins.remove_bg import RemoveBG
@@ -59,6 +62,8 @@ from modern_iopaint.schema import (
     RemoveBGModel,
     SwitchPluginModelRequest,
     ModelInfo,
+    LicenseAcceptanceRequest,
+    LicenseAcceptanceResponse,
     InteractiveSegModel,
     RealESRGANModel,
 )
@@ -87,6 +92,12 @@ def api_middleware(app: FastAPI):
             "body": vars(e).get("body", ""),
             "errors": str(e),
         }
+        if hasattr(e, "code"):
+            err["code"] = getattr(e, "code")
+        if hasattr(e, "repo_id"):
+            err["repo_id"] = getattr(e, "repo_id")
+        if hasattr(e, "model_url"):
+            err["model_url"] = getattr(e, "model_url")
         if not isinstance(
             e, HTTPException
         ):  # do not print backtrace on known httpexceptions
@@ -163,6 +174,8 @@ class Api:
                            response_model=ServerConfigResponse)
         self.add_api_route("/api/v1/model", self.api_current_model, methods=["GET"], response_model=ModelInfo)
         self.add_api_route("/api/v1/model", self.api_switch_model, methods=["POST"], response_model=ModelInfo)
+        self.add_api_route("/api/v1/license-acceptance", self.api_license_acceptance, methods=["GET"], response_model=LicenseAcceptanceResponse)
+        self.add_api_route("/api/v1/license-acceptance", self.api_set_license_acceptance, methods=["POST"], response_model=LicenseAcceptanceResponse)
         self.add_api_route("/api/v1/inputimage", self.api_input_image, methods=["GET"])
         self.add_api_route("/api/v1/inpaint", self.api_inpaint, methods=["POST"])
         self.add_api_route("/api/v1/switch_plugin_model", self.api_switch_plugin_model, methods=["POST"])
@@ -208,8 +221,43 @@ class Api:
     def api_switch_model(self, req: SwitchModelRequest) -> ModelInfo:
         if req.name == self.model_manager.name:
             return self.model_manager.current_model
+        if req.name == FLUX_FILL_NAME and not is_license_accepted(
+            req.name, self.config.model_dir
+        ):
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "Accept the FLUX.1-dev Non-Commercial License notice before "
+                    "selecting FLUX Fill."
+                ),
+            )
         self.model_manager.switch(req.name)
         return self.model_manager.current_model
+
+    def _license_response(self, model: str) -> LicenseAcceptanceResponse:
+        record = load_model_manifest().get(model)
+        return LicenseAcceptanceResponse(
+            model=model,
+            accepted=is_license_accepted(model, self.config.model_dir),
+            license_name=record.license_name,
+            license_url=record.license_url,
+        )
+
+    def api_license_acceptance(self, model: str) -> LicenseAcceptanceResponse:
+        return self._license_response(model)
+
+    def api_set_license_acceptance(
+        self, req: LicenseAcceptanceRequest
+    ) -> LicenseAcceptanceResponse:
+        record = load_model_manifest().get(req.model)
+        set_license_accepted(
+            req.model,
+            accepted=req.accepted,
+            license_name=record.license_name,
+            license_url=record.license_url,
+            model_dir=self.config.model_dir,
+        )
+        return self._license_response(req.model)
 
     def api_switch_plugin_model(self, req: SwitchPluginModelRequest):
         if req.plugin_name in self.plugins:
@@ -412,5 +460,6 @@ class Api:
             qwen_precision=self.config.qwen_precision,
             qwen_rank=self.config.qwen_rank,
             qwen_lightning_steps=self.config.qwen_lightning_steps,
+            flux_precision=self.config.flux_precision,
             runtime_profile=self.config.runtime_profile,
         )

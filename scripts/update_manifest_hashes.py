@@ -100,6 +100,12 @@ def update_manifest(path: Path, include_placeholders: bool) -> None:
         print(f"PIN  {name} base: {base['repo']}")
         pin_download_spec(api, base, base["allow_patterns"])
 
+        for component_name, component in record.get(
+            "optional_components", {}
+        ).items():
+            print(f"PIN  {name} {component_name}: {component['repo']}")
+            pin_download_spec(api, component, component["allow_patterns"])
+
     with path.open("w", encoding="utf-8", newline="\n") as file:
         json.dump(manifest, file, indent=2, ensure_ascii=False)
         file.write("\n")

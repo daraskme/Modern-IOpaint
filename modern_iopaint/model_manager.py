@@ -6,7 +6,7 @@ import torch
 from loguru import logger
 
 from modern_iopaint.download import scan_models
-from modern_iopaint.const import QWEN_IMAGE_EDIT_NAME, QWEN_IMAGE_NAME
+from modern_iopaint.const import FLUX_FILL_NAME, QWEN_IMAGE_EDIT_NAME, QWEN_IMAGE_NAME
 from modern_iopaint.helper import switch_mps_device
 from modern_iopaint.model import ControlNet, SD, SDXL, models
 from modern_iopaint.model.utils import is_local_files_only
@@ -106,6 +106,7 @@ class ModelManager:
             qwen_precision=self.kwargs.get("qwen_precision", "auto"),
             qwen_rank=self.kwargs.get("qwen_rank", "r32"),
             qwen_lightning_steps=self.kwargs.get("qwen_lightning_steps", 8),
+            flux_precision=self.kwargs.get("flux_precision", "auto"),
         )
         self.available_models = {it.name: it for it in available_models}
         return available_models
@@ -114,7 +115,11 @@ class ModelManager:
     def _is_large_model(model_info: Optional[ModelInfo]) -> bool:
         if model_info is None:
             return False
-        return model_info.name in [QWEN_IMAGE_NAME, QWEN_IMAGE_EDIT_NAME] or (
+        return model_info.name in [
+            QWEN_IMAGE_NAME,
+            QWEN_IMAGE_EDIT_NAME,
+            FLUX_FILL_NAME,
+        ] or (
             model_info.model_type
             in [
                 ModelType.DIFFUSERS_SD,

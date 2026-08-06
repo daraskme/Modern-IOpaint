@@ -8,6 +8,7 @@ from loguru import logger
 from modern_iopaint.const import (
     INSTRUCT_PIX2PIX_NAME,
     KANDINSKY22_NAME,
+    FLUX_FILL_NAME,
     QWEN_IMAGE_EDIT_NAME,
     QWEN_IMAGE_NAME,
     SDXL_CONTROLNET_CHOICES,
@@ -33,6 +34,9 @@ class ModelInfo(BaseModel):
     is_single_file_diffusers: bool = False
     default_steps: Optional[int] = 50
     default_guidance_scale: Optional[float] = 7.5
+    license_name: Optional[str] = None
+    license_url: Optional[str] = None
+    gated: bool = False
 
     @computed_field
     @property
@@ -47,6 +51,7 @@ class ModelInfo(BaseModel):
             KANDINSKY22_NAME,
             QWEN_IMAGE_NAME,
             QWEN_IMAGE_EDIT_NAME,
+            FLUX_FILL_NAME,
         ]
 
     @computed_field
@@ -77,7 +82,7 @@ class ModelInfo(BaseModel):
             ModelType.DIFFUSERS_SDXL,
             ModelType.DIFFUSERS_SD_INPAINT,
             ModelType.DIFFUSERS_SDXL_INPAINT,
-        ] or self.name in [QWEN_IMAGE_NAME, QWEN_IMAGE_EDIT_NAME]
+        ] or self.name in [QWEN_IMAGE_NAME, QWEN_IMAGE_EDIT_NAME, FLUX_FILL_NAME]
 
     @computed_field
     @property
@@ -91,6 +96,7 @@ class ModelInfo(BaseModel):
             KANDINSKY22_NAME,
             QWEN_IMAGE_NAME,
             QWEN_IMAGE_EDIT_NAME,
+            FLUX_FILL_NAME,
         ]
 
     @computed_field
@@ -265,6 +271,7 @@ class ApiConfig(BaseModel):
     qwen_precision: Literal["auto", "int4", "fp4"] = "auto"
     qwen_rank: Literal["r32", "r128"] = "r32"
     qwen_lightning_steps: Literal[0, 4, 8] = 8
+    flux_precision: Literal["auto", "int4", "fp4"] = "auto"
     runtime_profile: Literal["auto", "fast", "balanced", "conservative"] = "auto"
 
 
@@ -448,6 +455,18 @@ class ServerConfigResponse(BaseModel):
 
 class SwitchModelRequest(BaseModel):
     name: str
+
+
+class LicenseAcceptanceRequest(BaseModel):
+    model: str
+    accepted: bool
+
+
+class LicenseAcceptanceResponse(BaseModel):
+    model: str
+    accepted: bool
+    license_name: str
+    license_url: str
 
 
 class SwitchPluginModelRequest(BaseModel):

@@ -156,6 +156,77 @@
         ],
         "sha256": null
       }
+    },
+    "flux.1-fill-dev": {
+      "integrated": true,
+      "backend": "flux_fill",
+      "repo": "nunchaku-ai/nunchaku-flux.1-fill-dev",
+      "revision": "main",
+      "revision_note": "TODO(P3): replace main with an exact commit hash after running scripts/update_manifest_hashes.py.",
+      "filename_templates": {
+        "none": "svdq-{precision}_{rank}-flux.1-fill-dev.safetensors"
+      },
+      "precisions": [
+        "int4",
+        "fp4"
+      ],
+      "ranks": [
+        "r32"
+      ],
+      "lightning_steps": [
+        0
+      ],
+      "approx_download_size": "about 19.3 GiB including one quantized transformer, the gated base components, and optional int4 T5-XXL",
+      "approx_download_size_bytes": 20723217203,
+      "transformer_approx_download_size_bytes": 7301444403,
+      "license_name": "FLUX.1-dev Non-Commercial License",
+      "license_url": "https://github.com/black-forest-labs/flux/blob/main/model_licenses/LICENSE-FLUX1-dev",
+      "gated": false,
+      "allow_patterns": [
+        "{filename}"
+      ],
+      "ignore_patterns": [],
+      "sha256": null,
+      "base": {
+        "repo": "black-forest-labs/FLUX.1-Fill-dev",
+        "revision": "main",
+        "revision_note": "TODO(P3): replace main with an exact commit hash after running scripts/update_manifest_hashes.py.",
+        "approx_download_size_bytes": 10737418240,
+        "license_name": "FLUX.1-dev Non-Commercial License",
+        "license_url": "https://github.com/black-forest-labs/flux/blob/main/model_licenses/LICENSE-FLUX1-dev",
+        "gated": true,
+        "allow_patterns": [
+          "model_index.json",
+          "scheduler/*",
+          "tokenizer/*",
+          "tokenizer_2/*",
+          "text_encoder/*",
+          "text_encoder_2/*",
+          "vae/*"
+        ],
+        "ignore_patterns": [
+          "transformer",
+          "transformer/*",
+          "flux1-fill-dev.safetensors"
+        ],
+        "sha256": null
+      },
+      "optional_components": {
+        "nunchaku_t5": {
+          "repo": "nunchaku-ai/nunchaku-t5",
+          "revision": "main",
+          "revision_note": "TODO(P3): replace main with an exact commit hash after running scripts/update_manifest_hashes.py.",
+          "approx_download_size_bytes": 2684354560,
+          "license_name": "Apache-2.0",
+          "license_url": "https://huggingface.co/nunchaku-ai/nunchaku-t5/blob/main/LICENSE",
+          "gated": false,
+          "allow_patterns": [
+            "awq-int4-flux.1-t5xxl.safetensors"
+          ],
+          "ignore_patterns": [],
+          "sha256": null
+        }
+      }
     }
   }
 }

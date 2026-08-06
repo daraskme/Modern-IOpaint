@@ -101,7 +101,7 @@ def select_runtime_profile(device, override: Optional[str] = None) -> RuntimePro
     import torch
 
     if not torch.cuda.is_available() or str(device).split(":", 1)[0] != "cuda":
-        raise RuntimeError("Qwen/Nunchaku backends require an available CUDA device")
+        raise RuntimeError("Nunchaku backends require an available CUDA device")
 
     device_index = getattr(device, "index", None)
     if device_index is None:
@@ -140,7 +140,7 @@ def select_runtime_profile(device, override: Optional[str] = None) -> RuntimePro
         f", transformer blocks on GPU={blocks}" if blocks is not None else ""
     )
     logger.info(
-        "Qwen runtime profile: {} ({}; free VRAM={:.2f} GiB / {:.2f} GiB, "
+        "Nunchaku runtime profile: {} ({}; free VRAM={:.2f} GiB / {:.2f} GiB, "
         "system RAM={:.2f} GiB{})",
         selection.profile.value,
         override_text,

@@ -1,6 +1,14 @@
 import { IconButton } from "@/components/ui/button"
 import { useToggle } from "@uidotdev/usehooks"
-import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "./ui/dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "./ui/dialog"
 import { Settings } from "lucide-react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
@@ -20,7 +28,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs"
 import { useEffect, useState } from "react"
 import { cn } from "@/lib/utils"
 import { useQuery } from "@tanstack/react-query"
-import { getServerConfig, switchModel, switchPluginModel } from "@/lib/api"
+import {
+  getLicenseAcceptance,
+  getServerConfig,
+  setLicenseAcceptance,
+  switchModel,
+  switchPluginModel,
+} from "@/lib/api"
 import { ModelInfo, PluginName } from "@/lib/types"
 import { useStore } from "@/lib/states"
 import { ScrollArea } from "./ui/scroll-area"
@@ -67,6 +81,7 @@ const TAB_PLUGINS = "Plugins"
 // const TAB_FILE_MANAGER = "File Manager"
 
 const TAB_NAMES = [TAB_MODEL, TAB_GENERAL, TAB_PLUGINS]
+const FLUX_NON_COMMERCIAL_LICENSE = "FLUX.1-dev Non-Commercial License"
 
 export function SettingsDialog() {
   const [open, toggleOpen] = useToggle(false)
@@ -88,6 +103,8 @@ export function SettingsDialog() {
   ])
   const { toast } = useToast()
   const [model, setModel] = useState<ModelInfo>(settings.model)
+  const [licenseModel, setLicenseModel] = useState<ModelInfo | null>(null)
+  const [isSavingLicense, setIsSavingLicense] = useState(false)
   const [modelSwitchingTexts, setModelSwitchingTexts] = useState<string[]>([])
   const openModelSwitching = modelSwitchingTexts.length > 0
   useEffect(() => {
@@ -293,8 +310,42 @@ export function SettingsDialog() {
     }
   }
 
-  function onModelSelect(info: ModelInfo) {
+  async function onModelSelect(info: ModelInfo) {
+    if (info.license_name === FLUX_NON_COMMERCIAL_LICENSE) {
+      try {
+        const acceptance = await getLicenseAcceptance(info.name)
+        if (!acceptance.accepted) {
+          setLicenseModel(info)
+          return
+        }
+      } catch (error: any) {
+        toast({
+          variant: "destructive",
+          title: "Unable to check model license acceptance",
+          description: error.message ? error.message : error.toString(),
+        })
+        return
+      }
+    }
     setModel(info)
+  }
+
+  async function confirmLicenseAcceptance() {
+    if (!licenseModel) return
+    setIsSavingLicense(true)
+    try {
+      await setLicenseAcceptance(licenseModel.name, true)
+      setModel(licenseModel)
+      setLicenseModel(null)
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Unable to save license acceptance",
+        description: error.message ? error.message : error.toString(),
+      })
+    } finally {
+      setIsSavingLicense(false)
+    }
   }
 
   function renderModelList(model_types: string[]) {
@@ -317,7 +368,14 @@ export function SettingsDialog() {
                 "cursor-default",
               ])}
             >
-              <div className="text-base">{info.name}</div>
+              <div className="flex items-center gap-2 text-base">
+                <span>{info.name}</span>
+                {info.license_name === FLUX_NON_COMMERCIAL_LICENSE ? (
+                  <span className="rounded-full border border-amber-600/50 bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-700 dark:text-amber-300">
+                    Non-commercial
+                  </span>
+                ) : null}
+              </div>
             </div>
             <Separator className="my-1" />
           </div>
@@ -667,6 +725,58 @@ export function SettingsDialog() {
 
   return (
     <>
+      <Dialog
+        open={licenseModel !== null}
+        onOpenChange={(value) => {
+          if (!value && !isSavingLicense) setLicenseModel(null)
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>FLUX.1-dev License Notice</DialogTitle>
+            <DialogDescription>
+              Review these terms before selecting FLUX Fill.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 text-sm leading-relaxed">
+            <p>
+              This model is licensed under the FLUX.1-dev Non-Commercial
+              License. Commercial operation requires a separate license from
+              Black Forest Labs.
+            </p>
+            <p>
+              Generated outputs may be used as permitted by that license, but
+              the model itself remains restricted. The license also includes
+              content-filtering and output-review obligations.
+            </p>
+            <a
+              className="text-primary underline underline-offset-4"
+              href={licenseModel?.license_url || "#"}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Read the full FLUX.1-dev license
+            </a>
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={isSavingLicense}
+              onClick={() => setLicenseModel(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              disabled={isSavingLicense}
+              onClick={confirmLicenseAcceptance}
+            >
+              {isSavingLicense ? "Saving..." : "I understand and accept"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <AlertDialog open={openModelSwitching}>
         <AlertDialogContent>
           <AlertDialogHeader>

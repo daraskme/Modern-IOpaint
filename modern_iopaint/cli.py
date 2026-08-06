@@ -18,7 +18,11 @@ typer_app = typer.Typer(pretty_exceptions_show_locals=False, add_completion=Fals
 
 
 def validate_qwen_options(
-    precision: str, rank: str, lightning_steps: int, runtime_profile: str = "auto"
+    precision: str,
+    rank: str,
+    lightning_steps: int,
+    runtime_profile: str = "auto",
+    flux_precision: str = "auto",
 ):
     if precision not in ("auto", "int4", "fp4"):
         raise typer.BadParameter("must be auto, int4, or fp4", param_hint="qwen-precision")
@@ -31,6 +35,10 @@ def validate_qwen_options(
             "must be auto, fast, balanced, or conservative",
             param_hint="runtime-profile",
         )
+    if flux_precision not in ("auto", "int4", "fp4"):
+        raise typer.BadParameter(
+            "must be auto, int4, or fp4", param_hint="flux-precision"
+        )
 
 
 @typer_app.command(help="Install all plugins dependencies")
@@ -40,7 +48,9 @@ def install_plugins_packages():
     install_plugins_package()
 
 
-@typer_app.command(help="Download a manifest Qwen model or SD/SDXL model from Hugging Face")
+@typer_app.command(
+    help="Download a manifest Qwen/FLUX model or SD/SDXL model from Hugging Face"
+)
 def download(
     model: str = Option(
         ..., help="Model id on HuggingFace e.g: runwayml/stable-diffusion-inpainting"
@@ -58,17 +68,75 @@ def download(
     qwen_lightning_steps: int = Option(
         8, envvar="MODERN_IOPAINT_QWEN_LIGHTNING_STEPS"
     ),
+    flux_precision: str = Option(
+        "auto", envvar="MODERN_IOPAINT_FLUX_PRECISION"
+    ),
 ):
-    from modern_iopaint.download import cli_download_model
+    from modern_iopaint.download import FluxAccessError, cli_download_model
 
-    validate_qwen_options(qwen_precision, qwen_rank, qwen_lightning_steps)
-    cli_download_model(
-        model,
-        precision=qwen_precision,
-        rank=qwen_rank,
-        lightning_steps=qwen_lightning_steps,
-        cache_dir=model_dir,
+    validate_qwen_options(
+        qwen_precision,
+        qwen_rank,
+        qwen_lightning_steps,
+        flux_precision=flux_precision,
     )
+    selected_precision = flux_precision if model == FLUX_FILL_NAME else qwen_precision
+    try:
+        cli_download_model(
+            model,
+            precision=selected_precision,
+            rank=qwen_rank,
+            lightning_steps=qwen_lightning_steps,
+            cache_dir=model_dir,
+        )
+    except FluxAccessError as error:
+        typer.echo(str(error), err=True)
+        raise typer.Exit(code=1) from error
+
+
+@typer_app.command(
+    name="check-flux-access",
+    help="Check Hugging Face authentication and FLUX.1-Fill-dev license access",
+)
+def check_flux_access(
+    token: Optional[str] = Option(None, envvar="HF_TOKEN", help="Hugging Face token"),
+):
+    from huggingface_hub import HfApi
+    from huggingface_hub.errors import GatedRepoError, HfHubHTTPError
+
+    from modern_iopaint.download import BFL_FLUX_FILL_REPO, BFL_FLUX_FILL_MODEL_URL
+
+    api = HfApi()
+    try:
+        account = api.whoami(token=token)
+    except Exception as error:
+        typer.echo("Authentication: FAILED", err=True)
+        typer.echo(f"License acceptance: UNKNOWN ({error})", err=True)
+        typer.echo(
+            "Log in with `huggingface-cli login` (or `hf auth login`) or set "
+            "HF_TOKEN, then retry.",
+            err=True,
+        )
+        raise typer.Exit(code=1) from error
+
+    account_name = account.get("name") or account.get("fullname") or "authenticated user"
+    typer.echo(f"Authentication: OK ({account_name})")
+    try:
+        info = api.model_info(BFL_FLUX_FILL_REPO, token=token)
+    except GatedRepoError as error:
+        typer.echo("License acceptance: REQUIRED", err=True)
+        typer.echo(f"Accept the license at {BFL_FLUX_FILL_MODEL_URL}", err=True)
+        raise typer.Exit(code=2) from error
+    except HfHubHTTPError as error:
+        status = getattr(getattr(error, "response", None), "status_code", None)
+        if status in (401, 403):
+            typer.echo("License acceptance: REQUIRED or token lacks access", err=True)
+            typer.echo(f"Accept the license at {BFL_FLUX_FILL_MODEL_URL}", err=True)
+            raise typer.Exit(code=2) from error
+        raise
+
+    typer.echo(f"Repository gating: {getattr(info, 'gated', None)}")
+    typer.echo("License acceptance: OK (repository metadata is accessible with this token)")
 
 
 @typer_app.command(name="list", help="List downloaded models")
@@ -86,15 +154,24 @@ def list_model(
     qwen_lightning_steps: int = Option(
         8, envvar="MODERN_IOPAINT_QWEN_LIGHTNING_STEPS"
     ),
+    flux_precision: str = Option(
+        "auto", envvar="MODERN_IOPAINT_FLUX_PRECISION"
+    ),
 ):
     from modern_iopaint.download import scan_models
 
-    validate_qwen_options(qwen_precision, qwen_rank, qwen_lightning_steps)
+    validate_qwen_options(
+        qwen_precision,
+        qwen_rank,
+        qwen_lightning_steps,
+        flux_precision=flux_precision,
+    )
     scanned_models = scan_models(
         model_dir,
         qwen_precision=qwen_precision,
         qwen_rank=qwen_rank,
         qwen_lightning_steps=qwen_lightning_steps,
+        flux_precision=flux_precision,
     )
     for it in scanned_models:
         print(it.name)
@@ -132,6 +209,9 @@ def run(
     qwen_lightning_steps: int = Option(
         8, envvar="MODERN_IOPAINT_QWEN_LIGHTNING_STEPS"
     ),
+    flux_precision: str = Option(
+        "auto", envvar="MODERN_IOPAINT_FLUX_PRECISION"
+    ),
     runtime_profile: str = Option(
         "auto", envvar="MODERN_IOPAINT_RUNTIME_PROFILE"
     ),
@@ -139,19 +219,24 @@ def run(
     from modern_iopaint.download import cli_download_model, scan_models
 
     validate_qwen_options(
-        qwen_precision, qwen_rank, qwen_lightning_steps, runtime_profile
+        qwen_precision,
+        qwen_rank,
+        qwen_lightning_steps,
+        runtime_profile,
+        flux_precision,
     )
     scanned_models = scan_models(
         model_dir,
         qwen_precision=qwen_precision,
         qwen_rank=qwen_rank,
         qwen_lightning_steps=qwen_lightning_steps,
+        flux_precision=flux_precision,
     )
     if model not in [it.name for it in scanned_models]:
         logger.info(f"{model} not found in {model_dir}, try to downloading")
         cli_download_model(
             model,
-            precision=qwen_precision,
+            precision=flux_precision if model == FLUX_FILL_NAME else qwen_precision,
             rank=qwen_rank,
             lightning_steps=qwen_lightning_steps,
             cache_dir=model_dir,
@@ -171,6 +256,7 @@ def run(
         qwen_precision=qwen_precision,
         qwen_rank=qwen_rank,
         qwen_lightning_steps=qwen_lightning_steps,
+        flux_precision=flux_precision,
         runtime_profile=runtime_profile,
     )
 
@@ -231,6 +317,9 @@ def start(
     qwen_lightning_steps: int = Option(
         8, envvar="MODERN_IOPAINT_QWEN_LIGHTNING_STEPS"
     ),
+    flux_precision: str = Option(
+        "auto", envvar="MODERN_IOPAINT_FLUX_PRECISION"
+    ),
     runtime_profile: str = Option(
         "auto", envvar="MODERN_IOPAINT_RUNTIME_PROFILE"
     ),
@@ -241,7 +330,11 @@ def start(
     realesrgan_device = check_device(realesrgan_device)
     gfpgan_device = check_device(gfpgan_device)
     validate_qwen_options(
-        qwen_precision, qwen_rank, qwen_lightning_steps, runtime_profile
+        qwen_precision,
+        qwen_rank,
+        qwen_lightning_steps,
+        runtime_profile,
+        flux_precision,
     )
 
     if input and not input.exists():
@@ -277,12 +370,13 @@ def start(
         qwen_precision=qwen_precision,
         qwen_rank=qwen_rank,
         qwen_lightning_steps=qwen_lightning_steps,
+        flux_precision=flux_precision,
     )
     if model not in [it.name for it in scanned_models]:
         logger.info(f"{model} not found in {model_dir}, try to downloading")
         cli_download_model(
             model,
-            precision=qwen_precision,
+            precision=flux_precision if model == FLUX_FILL_NAME else qwen_precision,
             rank=qwen_rank,
             lightning_steps=qwen_lightning_steps,
             cache_dir=model_dir,
@@ -333,6 +427,7 @@ def start(
         qwen_precision=qwen_precision,
         qwen_rank=qwen_rank,
         qwen_lightning_steps=qwen_lightning_steps,
+        flux_precision=flux_precision,
         runtime_profile=runtime_profile,
     )
     print(api_config.model_dump_json(indent=4))

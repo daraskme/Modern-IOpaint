@@ -5,6 +5,7 @@ INSTRUCT_PIX2PIX_NAME = "timbrooks/instruct-pix2pix"
 KANDINSKY22_NAME = "kandinsky-community/kandinsky-2-2-decoder-inpaint"
 QWEN_IMAGE_NAME = "qwen-image"
 QWEN_IMAGE_EDIT_NAME = "qwen-image-edit"
+FLUX_FILL_NAME = "flux.1-fill-dev"
 DIFFUSERS_SD_CLASS_NAME = "StableDiffusionPipeline"
 DIFFUSERS_SD_INPAINT_CLASS_NAME = "StableDiffusionInpaintPipeline"
 DIFFUSERS_SDXL_CLASS_NAME = "StableDiffusionXLPipeline"
@@ -35,6 +36,7 @@ AVAILABLE_MODELS = [
 DIFFUSION_MODELS = [
     QWEN_IMAGE_NAME,
     QWEN_IMAGE_EDIT_NAME,
+    FLUX_FILL_NAME,
     "runwayml/stable-diffusion-inpainting",
     "Uminosachi/realisticVisionV51_v51VAE-inpainting",
     "redstonehero/dreamshaper-inpainting",

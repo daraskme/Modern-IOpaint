@@ -1,6 +1,7 @@
 import {
   Filename,
   GenInfo,
+  LicenseAcceptance,
   ModelInfo,
   PowerPaintTask,
   Rect,
@@ -108,7 +109,30 @@ export async function getServerConfig(): Promise<ServerConfig> {
 }
 
 export async function switchModel(name: string): Promise<ModelInfo> {
-  const res = await api.post(`/model`, { name })
+  try {
+    const res = await api.post(`/model`, { name })
+    return res.data
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      const message = error.response?.data?.errors || error.response?.data?.detail
+      if (message) throw new Error(message)
+    }
+    throw error
+  }
+}
+
+export async function getLicenseAcceptance(
+  model: string
+): Promise<LicenseAcceptance> {
+  const res = await api.get(`/license-acceptance`, { params: { model } })
+  return res.data
+}
+
+export async function setLicenseAcceptance(
+  model: string,
+  accepted: boolean
+): Promise<LicenseAcceptance> {
+  const res = await api.post(`/license-acceptance`, { model, accepted })
   return res.data
 }
 

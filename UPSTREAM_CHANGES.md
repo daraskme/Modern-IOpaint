@@ -199,3 +199,83 @@ selected Qwen Image, Qwen Image Edit, and LaMa models. It validates the
 manifest, performs masked inference for both Qwen pipelines, prints
 elapsed/peak VRAM statistics, and checks two Qwen-to-LaMa switch cycles. Use
 `--skip-edit` when only the non-edit model is installed.
+
+## Phase P3: optional FLUX.1-Fill backend and license compliance
+
+P3 adds `flux.1-fill-dev` as an optional `DIFFUSERS_OTHER` backend. It is only
+registered and discovered when the platform-specific Nunchaku package imports
+successfully. The backend inherits the existing diffusion crop, extend,
+strength, mask-blur, deterministic seed, and unmasked-area compositing paths.
+Its model defaults are 28 steps and guidance scale 30, and it deliberately does
+not pass a negative prompt to Diffusers.
+
+The implementation was grounded against the installed Nunchaku 1.2.1 and
+Diffusers 0.36.0 sources. The exported FLUX class is
+`NunchakuFluxTransformer2dModel` (lowercase `d` in `2d`), whose
+`from_pretrained(path, **kwargs)` reads the `offload` flag while constructing
+the quantized module. It does not expose Qwen's later `set_offload` method.
+The optional text encoder is `NunchakuT5EncoderModel`; its
+`from_pretrained(path, **kwargs)` accepts `torch_dtype` and `device`. The
+Diffusers `FluxFillPipeline` accepts the original image and white-repaint mask,
+defaults guidance to 30, and exposes VAE tiling through
+`enable_vae_tiling()`.
+
+Runtime profiles apply those APIs as follows:
+
+- `fast`: Diffusers model CPU offload;
+- `balanced`: model CPU offload plus VAE tiling;
+- `conservative`: `offload=True` while loading the Nunchaku FLUX transformer,
+  Diffusers sequential CPU offload, VAE tiling, and the optional int4
+  Nunchaku T5-XXL as `text_encoder_2` when cached.
+
+### Upstream-only weights and gated access
+
+No FLUX transformer, base-model, T5, tokenizer, VAE, or other weight file is
+bundled, mirrored, or copied into this repository or its application package.
+Downloads go directly into the user's Hugging Face cache from exactly these
+upstream repositories:
+
+- `nunchaku-ai/nunchaku-flux.1-fill-dev` for the selected r32 int4/fp4
+  transformer;
+- `black-forest-labs/FLUX.1-Fill-dev` for scheduler, tokenizers, CLIP,
+  T5-XXL, and VAE components;
+- `nunchaku-ai/nunchaku-t5` for the optional int4 T5-XXL.
+
+The BFL snapshot allowlist contains only `model_index.json`, scheduler,
+tokenizers, both text encoders, and VAE. Its ignore list independently excludes
+`transformer`, `transformer/*`, and the duplicate root-level
+`flux1-fill-dev.safetensors`, so neither full transformer representation is
+downloaded from the gated base repository. The manifest records approximately
+6.8 GiB for one quantized transformer, 10 GiB for the base components, and
+2.5 GiB for the optional int4 T5, with a combined disk preflight estimate.
+
+The BFL repository remains gated. A 401, 403, or `GatedRepoError` is converted
+to a structured `FluxAccessError` that tells the user to log into Hugging Face,
+accept the FLUX.1-dev license on the model page, and authenticate through
+`huggingface-cli login`/`hf auth login` or `HF_TOKEN`. Offline empty-cache
+access produces the same actionable result; gating is never bypassed.
+`modern-iopaint check-flux-access` reports authentication and repository
+license-access status using the installed Hugging Face Hub `whoami` and
+`model_info` APIs.
+
+### License notice and persisted acceptance
+
+The manifest identifies the model as licensed under the
+**FLUX.1-dev Non-Commercial License** and links to Black Forest Labs' full
+license text. The model selector displays a non-commercial badge. On first
+selection, the frontend requires explicit confirmation of a notice covering
+non-commercial model use, the separate commercial-license requirement,
+permitted output use, model restrictions, and content-filtering/output-review
+obligations.
+
+Acceptance is stored server-side in `modern_iopaint_settings.json` under the
+configured model/cache root, not merely in browser storage. The model-switch
+API refuses FLUX selection until that record exists, and subsequent frontend
+sessions read the persisted acceptance so the notice is only shown once.
+
+P3 was implemented statically without Python execution, network access, or
+runtime model loading. Run `python scripts/smoke_p3.py` externally. It validates
+the manifest, performs 1024x1024 eight-step masked inpainting under fast and
+conservative profiles with elapsed/peak-VRAM reporting, and checks the
+structured gated-error message. GPU/weight/auth-dependent stages print a clear
+`SKIP` when their prerequisites are unavailable.

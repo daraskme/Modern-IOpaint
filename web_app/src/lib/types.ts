@@ -57,6 +57,16 @@ export interface ModelInfo {
   is_single_file_diffusers: boolean
   default_steps?: number | null
   default_guidance_scale?: number | null
+  license_name?: string | null
+  license_url?: string | null
+  gated?: boolean
+}
+
+export interface LicenseAcceptance {
+  model: string
+  accepted: boolean
+  license_name: string
+  license_url: string
 }
 
 export enum PluginName {

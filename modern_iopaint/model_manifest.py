@@ -43,6 +43,8 @@ class ModelManifestRecord(DownloadSpec):
     ranks: Tuple[str, ...]
     lightning_steps: Tuple[int, ...]
     base: DownloadSpec
+    transformer_approx_download_size_bytes: int
+    optional_components: Mapping[str, DownloadSpec]
 
     def filename(self, precision: str, rank: str, lightning_steps: int) -> str:
         if precision not in self.precisions:
@@ -173,6 +175,32 @@ def _parse_model(name: str, data: Mapping[str, Any]) -> ModelManifestRecord:
             f"{location}.base.ignore_patterns must exclude transformer/*"
         )
 
+    transformer_size = data.get(
+        "transformer_approx_download_size_bytes",
+        common.approx_download_size_bytes,
+    )
+    if not isinstance(transformer_size, int) or transformer_size <= 0:
+        raise ManifestError(
+            f"{location}.transformer_approx_download_size_bytes must be a "
+            "positive integer"
+        )
+
+    raw_optional_components = data.get("optional_components", {})
+    if not isinstance(raw_optional_components, dict):
+        raise ManifestError(f"{location}.optional_components must be an object")
+    optional_components: Dict[str, DownloadSpec] = {}
+    for component_name, component_data in raw_optional_components.items():
+        component_location = f"{location}.optional_components.{component_name}"
+        if not isinstance(component_name, str) or not component_name:
+            raise ManifestError(
+                f"{location}.optional_components keys must be non-empty strings"
+            )
+        if not isinstance(component_data, dict):
+            raise ManifestError(f"{component_location} must be an object")
+        optional_components[component_name] = _parse_download_spec(
+            component_data, component_location
+        )
+
     templates = _require(data, "filename_templates", location)
     if not isinstance(templates, dict) or not all(
         isinstance(key, str) and isinstance(value, str)
@@ -214,6 +242,8 @@ def _parse_model(name: str, data: Mapping[str, Any]) -> ModelManifestRecord:
         ranks=ranks,
         lightning_steps=lightning_steps,
         base=base,
+        transformer_approx_download_size_bytes=transformer_size,
+        optional_components=optional_components,
     )
     for precision in record.precisions:
         for rank in record.ranks:
