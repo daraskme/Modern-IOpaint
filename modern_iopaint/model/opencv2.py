@@ -1,12 +1,13 @@
 import cv2
 from .base import InpaintModel
-from modern_iopaint.schema import InpaintRequest
+from modern_iopaint.schema import InpaintRequest, ModelCategory
 
 flag_map = {"INPAINT_NS": cv2.INPAINT_NS, "INPAINT_TELEA": cv2.INPAINT_TELEA}
 
 
 class OpenCV2(InpaintModel):
     name = "cv2"
+    category = ModelCategory.ERASE_PHOTO
     pad_mod = 1
     is_erase_model = True
 

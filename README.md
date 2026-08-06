@@ -58,6 +58,35 @@
 - [FileManager](https://iopaint.com/file_manager): Browse your pictures conveniently and save them directly to the output directory.
 
 
+## イラスト・アニメ絵の修正 / Illustration & anime editing
+
+`anime-lama` は、イラストやアニメ絵から不要な内容を消す用途に向いた
+消去モデルです。`qwen-image` と `qwen-image-edit` は、イラストを含む
+一般的な画像内容の修正に利用できます。
+
+Illustrious/NoobAI 系を含むローカル SDXL チェックポイントは、
+`--model-dir` 以下の `stable_diffusion_xl` ディレクトリから読み込めます。
+チェックポイントと同じ名前の JSON（例: `checkpoint-name.json`）を隣に置き、
+v-prediction モデルには
+`{"prediction_type": "v_prediction", "category": "inpaint-illustration"}`
+を指定してください。このアプリは特定の第三者チェックポイントを同梱、推奨、
+または保証しません。ローカルで読み込むモデルのライセンス確認と利用責任は
+ユーザーにあります。
+
+`anime-lama` is the erase model intended for removing unwanted content from
+illustrations and anime-style images. `qwen-image` and `qwen-image-edit` handle
+general image editing, including illustration content.
+
+Local SDXL checkpoints, including Illustrious/NoobAI-family checkpoints, can be
+loaded from the `stable_diffusion_xl` directory under `--model-dir`. Place a
+same-name JSON file beside the checkpoint (for example, `checkpoint-name.json`)
+and set
+`{"prediction_type": "v_prediction", "category": "inpaint-illustration"}`
+for a v-prediction illustration model. This application does not bundle,
+endorse, or guarantee any particular third-party checkpoint. The user remains
+responsible for the license and permitted use of every locally loaded model.
+
+
 ## Quick Start
 
 ### Start webui

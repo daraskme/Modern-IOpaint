@@ -38,6 +38,12 @@ export interface GenInfo {
 export interface ModelInfo {
   name: string
   path: string
+  category:
+    | "erase-photo"
+    | "erase-illustration"
+    | "inpaint-general"
+    | "inpaint-photo"
+    | "inpaint-illustration"
   model_type:
     | "inpaint"
     | "diffusers_sd"

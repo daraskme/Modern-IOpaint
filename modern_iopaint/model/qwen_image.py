@@ -9,13 +9,14 @@ from loguru import logger
 
 from modern_iopaint.const import QWEN_IMAGE_NAME
 from modern_iopaint.runtime_profile import RuntimeProfile, select_runtime_profile
-from modern_iopaint.schema import InpaintRequest
+from modern_iopaint.schema import InpaintRequest, ModelCategory
 
 from .base import DiffusionInpaintModel
 
 
 class QwenImage(DiffusionInpaintModel):
     name = QWEN_IMAGE_NAME
+    category = ModelCategory.INPAINT_GENERAL
     pad_mod = 16
     min_size = 1024
 

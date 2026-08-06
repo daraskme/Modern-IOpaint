@@ -27,11 +27,21 @@ class ModelType(str, Enum):
     DIFFUSERS_OTHER = "diffusers_other"
 
 
+class ModelCategory(str, Enum):
+    ERASE_PHOTO = "erase-photo"
+    ERASE_ILLUSTRATION = "erase-illustration"
+    INPAINT_GENERAL = "inpaint-general"
+    INPAINT_PHOTO = "inpaint-photo"
+    INPAINT_ILLUSTRATION = "inpaint-illustration"
+
+
 class ModelInfo(BaseModel):
     name: str
     path: str
     model_type: ModelType
+    category: ModelCategory = ModelCategory.INPAINT_PHOTO
     is_single_file_diffusers: bool = False
+    prediction_type: Optional[Literal["epsilon", "sample", "v_prediction"]] = None
     default_steps: Optional[int] = 50
     default_guidance_scale: Optional[float] = 7.5
     license_name: Optional[str] = None

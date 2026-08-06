@@ -1,7 +1,5 @@
 from pathlib import Path
-from typing import Any, Dict
-
-from omegaconf import OmegaConf
+from typing import Dict
 
 CURRENT_DIR = Path(__file__).parent.absolute()
 
@@ -21,8 +19,10 @@ def get_config_files() -> Dict[str, Path]:
     }
 
 
-def load_original_config(name: str) -> Dict[str, Any]:
-    """Load a legacy Stable Diffusion YAML for Diffusers' current single-file API."""
-    config_path = get_config_files()[name]
-    config = OmegaConf.load(config_path)
-    return OmegaConf.to_container(config, resolve=True)
+def load_original_config(name: str) -> str:
+    """Return a legacy Stable Diffusion YAML path for Diffusers' single-file API."""
+
+    # Diffusers 0.36 resolves ``original_config`` as a filesystem path or URL
+    # before parsing the YAML. Passing an already-parsed dict reaches
+    # os.path.isfile() inside Diffusers and fails before the checkpoint loads.
+    return str(get_config_files()[name])

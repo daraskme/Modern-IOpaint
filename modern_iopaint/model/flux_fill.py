@@ -9,7 +9,7 @@ from loguru import logger
 
 from modern_iopaint.const import FLUX_FILL_NAME
 from modern_iopaint.runtime_profile import RuntimeProfile, select_runtime_profile
-from modern_iopaint.schema import InpaintRequest
+from modern_iopaint.schema import InpaintRequest, ModelCategory
 
 from .base import DiffusionInpaintModel
 
@@ -18,6 +18,7 @@ class FluxFill(DiffusionInpaintModel):
     """FLUX.1-Fill-dev inpainting with a quantized Nunchaku transformer."""
 
     name = FLUX_FILL_NAME
+    category = ModelCategory.INPAINT_PHOTO
     pad_mod = 16
     min_size = 1024
 

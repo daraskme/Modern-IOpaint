@@ -12,13 +12,19 @@ from modern_iopaint.helper import (
     pad_img_to_modulo,
     switch_mps_device,
 )
-from modern_iopaint.schema import InpaintRequest, HDStrategy, SDSampler
+from modern_iopaint.schema import (
+    HDStrategy,
+    InpaintRequest,
+    ModelCategory,
+    SDSampler,
+)
 from .helper.g_diffuser_bot import expand_image
 from .utils import get_scheduler
 
 
 class InpaintModel:
     name = "base"
+    category = ModelCategory.ERASE_PHOTO
     min_size: Optional[int] = None
     pad_mod = 8
     pad_to_square = False
@@ -271,6 +277,8 @@ class InpaintModel:
 
 
 class DiffusionInpaintModel(InpaintModel):
+    category = ModelCategory.INPAINT_PHOTO
+
     def __init__(self, device, **kwargs):
         self.model_info = kwargs["model_info"]
         self.model_id_or_path = self.model_info.path

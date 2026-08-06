@@ -12,7 +12,7 @@ from modern_iopaint.helper import (
     norm_img,
 )
 from .base import InpaintModel
-from modern_iopaint.schema import InpaintRequest
+from modern_iopaint.schema import InpaintRequest, ModelCategory
 
 MIGAN_MODEL_URL = os.environ.get(
     "MIGAN_MODEL_URL",
@@ -23,6 +23,7 @@ MIGAN_MODEL_MD5 = os.environ.get("MIGAN_MODEL_MD5", "76eb3b1a71c400ee3290524f7a1
 
 class MIGAN(InpaintModel):
     name = "migan"
+    category = ModelCategory.ERASE_PHOTO
     min_size = 512
     pad_mod = 512
     pad_to_square = True

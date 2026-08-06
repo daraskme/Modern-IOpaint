@@ -5,6 +5,7 @@ from diffusers import AutoencoderKL
 from loguru import logger
 
 from modern_iopaint.schema import InpaintRequest, ModelType
+from modern_iopaint.model_metadata import apply_local_model_metadata
 
 from .base import DiffusionInpaintModel
 from .helper.cpu_text_encoder import CPUTextEncoderWrapper
@@ -47,6 +48,11 @@ class SDXL(DiffusionInpaintModel):
                 original_config=load_original_config("xl"),
                 **model_kwargs,
             )
+            metadata = apply_local_model_metadata(
+                self.model, self.model_id_or_path
+            )
+            self.model_info.category = metadata.category
+            self.model_info.prediction_type = metadata.prediction_type
         else:
             if "vae" not in model_kwargs:
                 vae = AutoencoderKL.from_pretrained(

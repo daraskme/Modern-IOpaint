@@ -22,12 +22,13 @@ from modern_iopaint.const import (
     DIFFUSERS_SDXL_INPAINT_CLASS_NAME,
     FLUX_FILL_NAME,
 )
-from modern_iopaint.schema import ModelInfo, ModelType
+from modern_iopaint.schema import ModelCategory, ModelInfo, ModelType
+from modern_iopaint.model_metadata import load_local_model_metadata
 from modern_iopaint.model.original_sd_configs import load_original_config
 from modern_iopaint.model_manifest import (
     DownloadSpec,
     ModelManifestRecord,
-    integrated_model_names,
+    integrated_bundle_model_names,
     load_model_manifest,
 )
 
@@ -517,7 +518,11 @@ def cli_download_model(
         raise ValueError(
             f"Model {model!r} is quarantined for the active Diffusers compatibility tuple"
         )
-    if model in integrated_model_names():
+    if model in models and models[model].is_erase_model:
+        logger.info(f"Downloading {model}...")
+        models[model].download()
+        logger.info("Done.")
+    elif model in integrated_bundle_model_names():
         download_manifest_model(
             model,
             precision=precision,
@@ -525,10 +530,6 @@ def cli_download_model(
             lightning_steps=lightning_steps,
             cache_dir=cache_dir,
         )
-    elif model in models and models[model].is_erase_model:
-        logger.info(f"Downloading {model}...")
-        models[model].download()
-        logger.info("Done.")
     else:
         logger.info(f"Downloading model from Huggingface: {model}")
         from huggingface_hub import snapshot_download
@@ -545,8 +546,11 @@ def folder_name_to_show_name(name: str) -> str:
 
 
 @lru_cache(maxsize=512)
-def get_sd_model_type(model_abs_path: str) -> Optional[ModelType]:
-    if "inpaint" in Path(model_abs_path).name.lower():
+def get_sd_model_type(
+    model_abs_path: str | os.PathLike[str],
+) -> Optional[ModelType]:
+    checkpoint_path = os.fspath(model_abs_path)
+    if "inpaint" in Path(checkpoint_path).name.lower():
         model_type = ModelType.DIFFUSERS_SD_INPAINT
     else:
         # load once to check num_in_channels
@@ -554,7 +558,7 @@ def get_sd_model_type(model_abs_path: str) -> Optional[ModelType]:
 
         try:
             StableDiffusionInpaintPipeline.from_single_file(
-                model_abs_path,
+                checkpoint_path,
                 safety_checker=None,
                 feature_extractor=None,
                 requires_safety_checker=False,
@@ -566,17 +570,20 @@ def get_sd_model_type(model_abs_path: str) -> Optional[ModelType]:
             if "[320, 4, 3, 3]" in str(e):
                 model_type = ModelType.DIFFUSERS_SD
             else:
-                logger.info(f"Ignore non sdxl file: {model_abs_path}")
+                logger.info(f"Ignore non sdxl file: {checkpoint_path}")
                 return
         except Exception as e:
-            logger.error(f"Failed to load {model_abs_path}: {e}")
+            logger.error(f"Failed to load {checkpoint_path}: {e}")
             return
     return model_type
 
 
 @lru_cache()
-def get_sdxl_model_type(model_abs_path: str) -> Optional[ModelType]:
-    if "inpaint" in model_abs_path:
+def get_sdxl_model_type(
+    model_abs_path: str | os.PathLike[str],
+) -> Optional[ModelType]:
+    checkpoint_path = os.fspath(model_abs_path)
+    if "inpaint" in checkpoint_path:
         model_type = ModelType.DIFFUSERS_SDXL_INPAINT
     else:
         # load once to check num_in_channels
@@ -584,7 +591,7 @@ def get_sdxl_model_type(model_abs_path: str) -> Optional[ModelType]:
 
         try:
             model = StableDiffusionXLInpaintPipeline.from_single_file(
-                model_abs_path,
+                checkpoint_path,
                 num_in_channels=9,
                 original_config=load_original_config("xl"),
             )
@@ -597,10 +604,10 @@ def get_sdxl_model_type(model_abs_path: str) -> Optional[ModelType]:
             if "[320, 4, 3, 3]" in str(e):
                 model_type = ModelType.DIFFUSERS_SDXL
             else:
-                logger.info(f"Ignore non sdxl file: {model_abs_path}")
+                logger.info(f"Ignore non sdxl file: {checkpoint_path}")
                 return
         except Exception as e:
-            logger.error(f"Failed to load {model_abs_path}: {e}")
+            logger.error(f"Failed to load {checkpoint_path}: {e}")
             return
     return model_type
 
@@ -629,13 +636,21 @@ def scan_single_file_diffusion_models(cache_dir) -> List[ModelInfo]:
         if model_type is None:
             continue
 
+        try:
+            metadata = load_local_model_metadata(it)
+        except ValueError as error:
+            logger.error("Ignoring local checkpoint {}: {}", it, error)
+            continue
+
         model_type_cache[it.name] = model_type
         res.append(
             ModelInfo(
                 name=it.name,
                 path=model_abs_path,
                 model_type=model_type,
+                category=metadata.category,
                 is_single_file_diffusers=True,
+                prediction_type=metadata.prediction_type,
             )
         )
     if stable_diffusion_dir.exists():
@@ -663,6 +678,12 @@ def scan_single_file_diffusion_models(cache_dir) -> List[ModelInfo]:
         if model_type is None:
             continue
 
+        try:
+            metadata = load_local_model_metadata(it)
+        except ValueError as error:
+            logger.error("Ignoring local checkpoint {}: {}", it, error)
+            continue
+
         sdxl_model_type_cache[it.name] = model_type
         if stable_diffusion_xl_dir.exists():
             with open(sdxl_cache_file, "w", encoding="utf-8") as fw:
@@ -673,7 +694,9 @@ def scan_single_file_diffusion_models(cache_dir) -> List[ModelInfo]:
                 name=it.name,
                 path=model_abs_path,
                 model_type=model_type,
+                category=metadata.category,
                 is_single_file_diffusers=True,
+                prediction_type=metadata.prediction_type,
             )
         )
     return res
@@ -685,13 +708,25 @@ def scan_inpaint_models(model_dir: Path) -> List[ModelInfo]:
 
     # logger.info(f"Scanning inpaint models in {model_dir}")
 
+    manifest_records = load_model_manifest().models
     for name, m in models.items():
         if m.is_erase_model and m.is_downloaded():
+            manifest_record = manifest_records.get(name)
             res.append(
                 ModelInfo(
                     name=name,
                     path=name,
                     model_type=ModelType.INPAINT,
+                    category=(
+                        manifest_record.category if manifest_record else m.category
+                    ),
+                    license_name=(
+                        manifest_record.license_name if manifest_record else None
+                    ),
+                    license_url=(
+                        manifest_record.license_url if manifest_record else None
+                    ),
+                    gated=manifest_record.gated if manifest_record else False,
                 )
             )
     return res
@@ -742,6 +777,7 @@ def scan_diffusers_models(cache_dir: Optional[Path] = None) -> List[ModelInfo]:
                 name=name,
                 path=name,
                 model_type=model_type,
+                category=ModelCategory.INPAINT_PHOTO,
             )
         )
     return available_models
@@ -792,7 +828,7 @@ def scan_manifest_models(
         return []
 
     available_models = []
-    for name in integrated_model_names():
+    for name in integrated_bundle_model_names():
         record = load_model_manifest().get(name)
         if name == FLUX_FILL_NAME:
             try:
@@ -827,6 +863,7 @@ def scan_manifest_models(
                 name=name,
                 path=name,
                 model_type=ModelType.DIFFUSERS_OTHER,
+                category=record.category,
                 default_steps=default_steps,
                 default_guidance_scale=default_guidance_scale,
                 license_name=record.license_name,
@@ -878,6 +915,7 @@ def _scan_converted_diffusers_models(cache_dir) -> List[ModelInfo]:
                     name=name,
                     path=str(it.parent.absolute()),
                     model_type=model_type,
+                    category=ModelCategory.INPAINT_PHOTO,
                 )
             )
     return available_models

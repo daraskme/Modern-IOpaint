@@ -4,6 +4,8 @@
     "qwen-image": {
       "integrated": true,
       "backend": "qwen_image",
+      "artifact_type": "nunchaku",
+      "category": "inpaint-general",
       "repo": "nunchaku-ai/nunchaku-qwen-image",
       "revision": "main",
       "revision_note": "TODO(P2): replace main with an exact commit hash after running scripts/update_manifest_hashes.py.",
@@ -56,6 +58,8 @@
     "qwen-image-edit": {
       "integrated": true,
       "backend": "qwen_image_edit",
+      "artifact_type": "nunchaku",
+      "category": "inpaint-general",
       "repo": "nunchaku-ai/nunchaku-qwen-image-edit",
       "revision": "main",
       "revision_note": "TODO(P2): replace main with an exact commit hash after running scripts/update_manifest_hashes.py.",
@@ -108,6 +112,8 @@
     "qwen-image-edit-2509": {
       "integrated": false,
       "backend": "qwen_image_edit_2509_placeholder",
+      "artifact_type": "nunchaku",
+      "category": "inpaint-general",
       "repo": "nunchaku-ai/nunchaku-qwen-image-edit-2509",
       "revision": "main",
       "revision_note": "TODO(P2): placeholder only; pin an exact revision and enable in a later phase.",
@@ -160,6 +166,8 @@
     "flux.1-fill-dev": {
       "integrated": true,
       "backend": "flux_fill",
+      "artifact_type": "nunchaku",
+      "category": "inpaint-photo",
       "repo": "nunchaku-ai/nunchaku-flux.1-fill-dev",
       "revision": "main",
       "revision_note": "TODO(P3): replace main with an exact commit hash after running scripts/update_manifest_hashes.py.",
@@ -227,6 +235,27 @@
           "sha256": null
         }
       }
+    },
+    "anime-lama": {
+      "integrated": true,
+      "backend": "anime_lama",
+      "artifact_type": "torchscript",
+      "category": "erase-illustration",
+      "repo": "dreMaz/AnimeMangaInpainting",
+      "source_url": "https://github.com/Sanster/models/releases/download/AnimeMangaInpainting/anime-manga-big-lama.pt",
+      "revision": "AnimeMangaInpainting",
+      "revision_note": "Upstream-hosted release asset used by the existing AnimeLaMa loader; MD5 29f284f36a0a510bcacf39ecf4c4d54f.",
+      "approx_download_size": "about 200 MB for the TorchScript checkpoint",
+      "approx_download_size_bytes": 206000000,
+      "license_name": "MIT",
+      "license_url": "https://github.com/dreMaz/AnimeMangaInpainting/blob/main/LICENSE",
+      "license_note": "MIT; checkpoint provenance: dreMaz/AnimeMangaInpainting.",
+      "gated": false,
+      "allow_patterns": [
+        "anime-manga-big-lama.pt"
+      ],
+      "ignore_patterns": [],
+      "sha256": null
     }
   }
 }

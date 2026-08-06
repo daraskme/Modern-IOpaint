@@ -10,7 +10,7 @@ from modern_iopaint.helper import (
     load_jit_model,
     download_model,
 )
-from modern_iopaint.schema import InpaintRequest
+from modern_iopaint.schema import InpaintRequest, ModelCategory
 from .base import InpaintModel
 
 LAMA_MODEL_URL = os.environ.get(
@@ -30,6 +30,7 @@ ANIME_LAMA_MODEL_MD5 = os.environ.get(
 
 class LaMa(InpaintModel):
     name = "lama"
+    category = ModelCategory.ERASE_PHOTO
     pad_mod = 8
     is_erase_model = True
 
@@ -67,6 +68,7 @@ class LaMa(InpaintModel):
 
 class AnimeLaMa(LaMa):
     name = "anime-lama"
+    category = ModelCategory.ERASE_ILLUSTRATION
 
     @staticmethod
     def download():

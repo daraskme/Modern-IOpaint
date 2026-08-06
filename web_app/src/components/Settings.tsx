@@ -82,6 +82,23 @@ const TAB_PLUGINS = "Plugins"
 
 const TAB_NAMES = [TAB_MODEL, TAB_GENERAL, TAB_PLUGINS]
 const FLUX_NON_COMMERCIAL_LICENSE = "FLUX.1-dev Non-Commercial License"
+const MODEL_CATEGORY_GROUPS: Array<{
+  label: string
+  categories: ModelInfo["category"][]
+}> = [
+  {
+    label: "実写/Photo",
+    categories: ["erase-photo", "inpaint-photo"],
+  },
+  {
+    label: "イラスト/Illustration",
+    categories: ["erase-illustration", "inpaint-illustration"],
+  },
+  {
+    label: "汎用/General",
+    categories: ["inpaint-general"],
+  },
+]
 
 export function SettingsDialog() {
   const [open, toggleOpen] = useToggle(false)
@@ -352,35 +369,48 @@ export function SettingsDialog() {
     if (!modelInfos) {
       return <div>Please download model first</div>
     }
-    return modelInfos
-      .filter((info) => model_types.includes(info.model_type))
-      .map((info: ModelInfo) => {
-        return (
-          <div
-            key={info.name}
-            onClick={() => onModelSelect(info)}
-            className="px-2"
-          >
-            <div
-              className={cn([
-                info.name === model.name ? "bg-muted" : "hover:bg-muted",
-                "rounded-md px-2 py-2",
-                "cursor-default",
-              ])}
-            >
-              <div className="flex items-center gap-2 text-base">
-                <span>{info.name}</span>
-                {info.license_name === FLUX_NON_COMMERCIAL_LICENSE ? (
-                  <span className="rounded-full border border-amber-600/50 bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-700 dark:text-amber-300">
-                    Non-commercial
-                  </span>
-                ) : null}
-              </div>
-            </div>
-            <Separator className="my-1" />
+    const matchingModels = modelInfos.filter((info) =>
+      model_types.includes(info.model_type)
+    )
+    return MODEL_CATEGORY_GROUPS.map((group) => {
+      const groupedModels = matchingModels.filter((info) =>
+        group.categories.includes(info.category)
+      )
+      if (groupedModels.length === 0) return null
+
+      return (
+        <div key={group.label}>
+          <div className="px-4 pb-1 pt-3 text-xs font-medium text-muted-foreground">
+            {group.label}
           </div>
-        )
-      })
+          {groupedModels.map((info: ModelInfo) => (
+            <div
+              key={info.name}
+              onClick={() => onModelSelect(info)}
+              className="px-2"
+            >
+              <div
+                className={cn([
+                  info.name === model.name ? "bg-muted" : "hover:bg-muted",
+                  "rounded-md px-2 py-2",
+                  "cursor-default",
+                ])}
+              >
+                <div className="flex items-center gap-2 text-base">
+                  <span>{info.name}</span>
+                  {info.license_name === FLUX_NON_COMMERCIAL_LICENSE ? (
+                    <span className="rounded-full border border-amber-600/50 bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-700 dark:text-amber-300">
+                      Non-commercial
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+              <Separator className="my-1" />
+            </div>
+          ))}
+        </div>
+      )
+    })
   }
 
   function renderModelSettings() {

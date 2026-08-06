@@ -315,6 +315,7 @@ const defaultValues: AppState = {
     model: {
       name: "lama",
       path: "lama",
+      category: "erase-photo",
       model_type: "inpaint",
       support_controlnet: false,
       support_brushnet: false,

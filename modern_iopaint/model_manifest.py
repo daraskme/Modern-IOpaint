@@ -6,6 +6,8 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, Mapping, Optional, Tuple
 
+from modern_iopaint.schema import ModelCategory
+
 
 MANIFEST_PATH = Path(__file__).with_name("model_manifest.json")
 SUPPORTED_MANIFEST_VERSION = 1
@@ -37,16 +39,24 @@ class ModelManifestRecord(DownloadSpec):
     name: str
     integrated: bool
     backend: str
+    artifact_type: str
+    category: ModelCategory
+    source_url: Optional[str]
+    license_note: str
     approx_download_size: str
     filename_templates: Mapping[str, str]
     precisions: Tuple[str, ...]
     ranks: Tuple[str, ...]
     lightning_steps: Tuple[int, ...]
-    base: DownloadSpec
+    base: Optional[DownloadSpec]
     transformer_approx_download_size_bytes: int
     optional_components: Mapping[str, DownloadSpec]
 
     def filename(self, precision: str, rank: str, lightning_steps: int) -> str:
+        if self.artifact_type != "nunchaku":
+            raise ManifestError(
+                f"Manifest model {self.name!r} is not a Nunchaku bundle"
+            )
         if precision not in self.precisions:
             raise ManifestError(
                 f"Unsupported precision {precision!r} for {self.name}; "
@@ -166,6 +176,55 @@ def _parse_download_spec(data: Mapping[str, Any], location: str) -> DownloadSpec
 def _parse_model(name: str, data: Mapping[str, Any]) -> ModelManifestRecord:
     location = f"models.{name}"
     common = _parse_download_spec(data, location)
+    integrated = _require(data, "integrated", location)
+    if not isinstance(integrated, bool):
+        raise ManifestError(f"{location}.integrated must be a boolean")
+
+    artifact_type = str(data.get("artifact_type", "nunchaku"))
+    if artifact_type not in ("nunchaku", "torchscript"):
+        raise ManifestError(
+            f"{location}.artifact_type must be 'nunchaku' or 'torchscript'"
+        )
+    try:
+        category = ModelCategory(str(_require(data, "category", location)))
+    except ValueError as error:
+        raise ManifestError(
+            f"{location}.category must be one of "
+            f"{[category.value for category in ModelCategory]}"
+        ) from error
+
+    source_url_value = data.get("source_url")
+    if source_url_value is not None and not isinstance(source_url_value, str):
+        raise ManifestError(f"{location}.source_url must be a string or null")
+    source_url = source_url_value or None
+    license_note = str(data.get("license_note", ""))
+
+    if artifact_type == "torchscript":
+        if not source_url:
+            raise ManifestError(f"{location}.source_url is required for torchscript")
+        return ModelManifestRecord(
+            **common.__dict__,
+            name=name,
+            integrated=integrated,
+            backend=str(_require(data, "backend", location)),
+            artifact_type=artifact_type,
+            category=category,
+            source_url=source_url,
+            license_note=license_note,
+            approx_download_size=str(
+                _require(data, "approx_download_size", location)
+            ),
+            filename_templates={},
+            precisions=(),
+            ranks=(),
+            lightning_steps=(),
+            base=None,
+            transformer_approx_download_size_bytes=(
+                common.approx_download_size_bytes
+            ),
+            optional_components={},
+        )
+
     base_data = _require(data, "base", location)
     if not isinstance(base_data, dict):
         raise ManifestError(f"{location}.base must be an object")
@@ -227,15 +286,15 @@ def _parse_model(name: str, data: Mapping[str, Any]) -> ModelManifestRecord:
     ):
         raise ManifestError(f"{location}.lightning_steps contains unsupported values")
 
-    integrated = _require(data, "integrated", location)
-    if not isinstance(integrated, bool):
-        raise ManifestError(f"{location}.integrated must be a boolean")
-
     record = ModelManifestRecord(
         **common.__dict__,
         name=name,
         integrated=integrated,
         backend=str(_require(data, "backend", location)),
+        artifact_type=artifact_type,
+        category=category,
+        source_url=source_url,
+        license_note=license_note,
         approx_download_size=str(_require(data, "approx_download_size", location)),
         filename_templates=dict(templates),
         precisions=precisions,
@@ -290,3 +349,12 @@ def load_model_manifest(path: Optional[str] = None) -> ModelManifest:
 def integrated_model_names() -> Tuple[str, ...]:
     manifest = load_model_manifest()
     return tuple(name for name, record in manifest.models.items() if record.integrated)
+
+
+def integrated_bundle_model_names() -> Tuple[str, ...]:
+    manifest = load_model_manifest()
+    return tuple(
+        name
+        for name, record in manifest.models.items()
+        if record.integrated and record.artifact_type == "nunchaku"
+    )

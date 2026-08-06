@@ -12,6 +12,7 @@ from .utils import (
     enable_low_mem,
     is_local_files_only,
 )
+from modern_iopaint.model_metadata import apply_local_model_metadata
 from modern_iopaint.schema import InpaintRequest, ModelType
 
 
@@ -54,6 +55,11 @@ class SD(DiffusionInpaintModel):
                 original_config=load_original_config("v1"),
                 **model_kwargs,
             )
+            metadata = apply_local_model_metadata(
+                self.model, self.model_id_or_path
+            )
+            self.model_info.category = metadata.category
+            self.model_info.prediction_type = metadata.prediction_type
         else:
             self.model = handle_from_pretrained_exceptions(
                 StableDiffusionInpaintPipeline.from_pretrained,

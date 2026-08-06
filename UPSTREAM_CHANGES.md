@@ -55,8 +55,8 @@ NumPy only.
 
 - Hugging Face model downloads use `snapshot_download`; `hf_hub_download` calls
   use explicit `repo_id` and `filename` keyword arguments.
-- Local SD/SDXL checkpoint loading supplies parsed `original_config` data rather
-  than the removed `original_config_file`/`load_safety_checker` arguments.
+- Local SD/SDXL checkpoint loading supplies the bundled YAML path through
+  `original_config` rather than the deprecated `original_config_file` argument.
 - Diffusers callbacks use `callback_on_step_end` and return `callback_kwargs`.
 - The CPU text-encoder wrapper is a plain `torch.nn.Module` instead of depending
   on Transformers' `PreTrainedModel` call internals.
@@ -279,3 +279,37 @@ the manifest, performs 1024x1024 eight-step masked inpainting under fast and
 conservative profiles with elapsed/peak-VRAM reporting, and checks the
 structured gated-error message. GPU/weight/auth-dependent stages print a clear
 `SKIP` when their prerequisites are unavailable.
+
+## Phase P4: illustration and anime support polish
+
+P4 promotes the existing `anime-lama` TorchScript backend to first-class model
+metadata. The manifest records its upstream-hosted source URL, approximate
+download size, MIT license, `dreMaz/AnimeMangaInpainting` provenance, and
+`erase-illustration` category. Model discovery now returns one of five explicit
+categories for every entry: photo or illustration erase, general inpainting,
+or photo or illustration inpainting. The frontend keeps the existing model-type
+tabs and groups each list under the bilingual `実写/Photo`,
+`イラスト/Illustration`, and `汎用/General` headings.
+
+Local single-file SD and SDXL discovery now reads an optional same-name JSON
+sidecar beside each `.ckpt` or `.safetensors` file. The sidecar supports
+`prediction_type` and `category`; local checkpoints default to
+`inpaint-photo`, while illustration checkpoints can opt into
+`inpaint-illustration`. After Diffusers 0.36 constructs the pipeline, an explicit
+`prediction_type` is registered on the scheduler config before inference. This
+corrects unreliable v-prediction inference for community SDXL checkpoints and
+is preserved when the application replaces the scheduler for the selected
+sampler.
+
+No third-party SDXL checkpoint is bundled or endorsed. Locally loaded model
+licenses and permitted usage remain the user's responsibility. P4 was
+implemented under the same static-only constraint: no Python, Git, network, or
+runtime model execution was used. Run `python scripts/smoke_p4.py` externally;
+use `--checkpoint PATH` for the two-step 512px local SDXL stage and
+`--skip-qwen` when the P2 Qwen runtime is unavailable. The script always reports
+a clear `PASS`, `FAIL`, or `SKIP` for its AnimeLaMa, local SDXL, and Qwen stages.
+
+P4 runtime verification found that Transformers 5.x is incompatible with
+Diffusers 0.36 single-file CLIP conversion during `from_single_file`.
+Transformers is therefore pinned to `4.57.6`, which has been verified working
+across the P1, P2, and P3 smoke suites.

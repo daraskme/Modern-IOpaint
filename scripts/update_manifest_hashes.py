@@ -92,6 +92,9 @@ def update_manifest(path: Path, include_placeholders: bool) -> None:
         if not record.get("integrated", False) and not include_placeholders:
             print(f"SKIP {name} (placeholder)")
             continue
+        if record.get("artifact_type", "nunchaku") != "nunchaku":
+            print(f"SKIP {name} (non-Hugging-Face artifact)")
+            continue
 
         print(f"PIN  {name}: {record['repo']}")
         pin_download_spec(api, record, transformer_filenames(record))
