@@ -4,9 +4,11 @@ examples/
 .idea/
 .vscode/
 build
-!iopaint/app/build
+!modern_iopaint/app/build
 dist/
-IOPaint.egg-info/
+modern_iopaint.egg-info/
 venv/
+.venv/
+.uv-bin/
 tmp/
-iopaint/web_app/
+modern_iopaint/web_app/

@@ -1,3 +1,5 @@
+> **Fork notice:** Modern-IOPaint is a modernization fork of [IOPaint](https://github.com/Sanster/IOPaint), based on upstream commit `61a759fb3f332bacdce8b2813f4837495c9b86e0`. It remains licensed under Apache-2.0; see [NOTICE](NOTICE) for attribution and modification tracking.
+
 <h1 align="center">IOPaint</h1>
 <p align="center">A free and open-source inpainting & outpainting tool powered by SOTA AI model.</p>
 
@@ -69,8 +71,8 @@ You can install and start IOPaint easily by running following command:
 # AMD GPU users, please utilize the following command, only works on linux, as pytorch is not yet supported on Windows with ROCm.
 # pip3 install torch==2.1.2 torchvision==0.16.2 --index-url https://download.pytorch.org/whl/rocm5.6
 
-pip3 install iopaint
-iopaint start --model=lama --device=cpu --port=8080
+pip3 install modern-iopaint
+modern-iopaint start --model=lama --device=cpu --port=8080
 ```
 
 That's it, you can start using IOPaint by visiting http://localhost:8080 in your web browser.
@@ -81,12 +83,12 @@ You can see other supported models at [here](https://www.iopaint.com/models) and
 
 ### Plugins
 
-You can specify which plugins to use when starting the service, and you can view the commands to enable plugins by using `iopaint start --help`. 
+You can specify which plugins to use when starting the service, and you can view the commands to enable plugins by using `modern-iopaint start --help`. 
 
 More demonstrations of the Plugin can be seen [here](https://www.iopaint.com/plugins)
 
 ```bash
-iopaint start --enable-interactive-seg --interactive-seg-device=cuda
+modern-iopaint start --enable-interactive-seg --interactive-seg-device=cuda
 ```
 
 ### Batch processing
@@ -94,7 +96,7 @@ iopaint start --enable-interactive-seg --interactive-seg-device=cuda
 You can also use IOPaint in the command line to batch process images:
 
 ```bash
-iopaint run --model=lama --device=cpu \
+modern-iopaint run --model=lama --device=cpu \
 --image=/path/to/image_folder \
 --mask=/path/to/mask_folder \
 --output=output_dir
@@ -114,7 +116,7 @@ git clone https://github.com/Sanster/IOPaint.git
 cd IOPaint/web_app
 npm install
 npm run build
-cp -r dist/ ../iopaint/web_app
+cp -r dist/ ../modern_iopaint/web_app
 ```
 
 Create a `.env.local` file in `web_app` and fill in the backend IP and port.

@@ -1,0 +1,11 @@
+Modern-IOPaint
+
+This project is a fork of IOPaint (https://github.com/Sanster/IOPaint),
+copyright Sanster/IOPaint contributors.
+
+The fork is based on upstream commit
+61a759fb3f332bacdce8b2813f4837495c9b86e0 (2025-04-29).
+
+Files modified by Modern-IOPaint are tracked through the repository's Git
+history. This project is licensed under the Apache License, Version 2.0; see
+the LICENSE file.
