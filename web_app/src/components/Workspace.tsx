@@ -9,15 +9,15 @@ import SidePanel from "./SidePanel"
 import DiffusionProgress from "./DiffusionProgress"
 
 const Workspace = () => {
-  const [file, updateSettings] = useStore((state) => [
+  const [file, setModel] = useStore((state) => [
     state.file,
-    state.updateSettings,
+    state.setModel,
   ])
 
   useEffect(() => {
     const fetchCurrentModel = async () => {
       const model = await currentModel()
-      updateSettings({ model })
+      setModel(model)
     }
     fetchCurrentModel()
   }, [])

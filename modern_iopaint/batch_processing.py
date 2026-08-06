@@ -4,6 +4,7 @@ from typing import Dict, Optional
 
 import cv2
 import numpy as np
+import torch
 from PIL import Image
 from loguru import logger
 from rich.console import Console
@@ -43,6 +44,12 @@ def batch_inpaint(
     output: Path,
     config: Optional[Path] = None,
     concat: bool = False,
+    *,
+    model_cache_dir: Optional[Path] = None,
+    qwen_precision: str = "auto",
+    qwen_rank: str = "r32",
+    qwen_lightning_steps: int = 8,
+    runtime_profile: str = "auto",
 ):
     if image.is_dir() and output.is_file():
         logger.error(
@@ -68,7 +75,15 @@ def batch_inpaint(
             inpaint_request = InpaintRequest(**json.load(f))
         logger.info(f"Using config: {inpaint_request}")
 
-    model_manager = ModelManager(name=model, device=device)
+    model_manager = ModelManager(
+        name=model,
+        device=torch.device(getattr(device, "value", device)),
+        model_cache_dir=model_cache_dir,
+        qwen_precision=qwen_precision,
+        qwen_rank=qwen_rank,
+        qwen_lightning_steps=qwen_lightning_steps,
+        runtime_profile=runtime_profile,
+    )
     first_mask = list(mask_paths.values())[0]
 
     console = Console()

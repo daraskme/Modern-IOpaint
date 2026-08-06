@@ -408,4 +408,9 @@ class Api:
             local_files_only=self.config.local_files_only,
             cpu_offload=self.config.cpu_offload,
             callback=diffuser_callback,
+            model_cache_dir=self.config.model_dir,
+            qwen_precision=self.config.qwen_precision,
+            qwen_rank=self.config.qwen_rank,
+            qwen_lightning_steps=self.config.qwen_lightning_steps,
+            runtime_profile=self.config.runtime_profile,
         )

@@ -8,6 +8,8 @@ from loguru import logger
 from modern_iopaint.const import (
     INSTRUCT_PIX2PIX_NAME,
     KANDINSKY22_NAME,
+    QWEN_IMAGE_EDIT_NAME,
+    QWEN_IMAGE_NAME,
     SDXL_CONTROLNET_CHOICES,
     SD2_CONTROLNET_CHOICES,
     SD_CONTROLNET_CHOICES,
@@ -29,6 +31,8 @@ class ModelInfo(BaseModel):
     path: str
     model_type: ModelType
     is_single_file_diffusers: bool = False
+    default_steps: Optional[int] = 50
+    default_guidance_scale: Optional[float] = 7.5
 
     @computed_field
     @property
@@ -41,6 +45,8 @@ class ModelInfo(BaseModel):
         ] or self.name in [
             INSTRUCT_PIX2PIX_NAME,
             KANDINSKY22_NAME,
+            QWEN_IMAGE_NAME,
+            QWEN_IMAGE_EDIT_NAME,
         ]
 
     @computed_field
@@ -71,7 +77,7 @@ class ModelInfo(BaseModel):
             ModelType.DIFFUSERS_SDXL,
             ModelType.DIFFUSERS_SD_INPAINT,
             ModelType.DIFFUSERS_SDXL_INPAINT,
-        ]
+        ] or self.name in [QWEN_IMAGE_NAME, QWEN_IMAGE_EDIT_NAME]
 
     @computed_field
     @property
@@ -81,7 +87,11 @@ class ModelInfo(BaseModel):
             ModelType.DIFFUSERS_SDXL,
             ModelType.DIFFUSERS_SD_INPAINT,
             ModelType.DIFFUSERS_SDXL_INPAINT,
-        ] or self.name == KANDINSKY22_NAME
+        ] or self.name in [
+            KANDINSKY22_NAME,
+            QWEN_IMAGE_NAME,
+            QWEN_IMAGE_EDIT_NAME,
+        ]
 
     @computed_field
     @property
@@ -251,6 +261,11 @@ class ApiConfig(BaseModel):
     gfpgan_device: Device
     enable_restoreformer: bool
     restoreformer_device: Device
+    model_dir: Optional[Path] = None
+    qwen_precision: Literal["auto", "int4", "fp4"] = "auto"
+    qwen_rank: Literal["r32", "r128"] = "r32"
+    qwen_lightning_steps: Literal[0, 4, 8] = 8
+    runtime_profile: Literal["auto", "fast", "balanced", "conservative"] = "auto"
 
 
 class InpaintRequest(BaseModel):

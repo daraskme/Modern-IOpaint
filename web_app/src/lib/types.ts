@@ -55,6 +55,8 @@ export interface ModelInfo {
   support_lcm_lora: boolean
   need_prompt: boolean
   is_single_file_diffusers: boolean
+  default_steps?: number | null
+  default_guidance_scale?: number | null
 }
 
 export enum PluginName {

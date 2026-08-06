@@ -9,6 +9,8 @@ from .mat import MAT
 from .mi_gan import MIGAN
 from .opencv2 import OpenCV2
 from .paint_by_example import PaintByExample
+from .qwen_image import QwenImage
+from .qwen_image_edit import QwenImageEdit
 from .sd import SD15, SD2, Anything4, RealisticVision14, SD
 from .sdxl import SDXL
 from .zits import ZITS
@@ -28,6 +30,8 @@ models = {
     RealisticVision14.name: RealisticVision14,
     SD2.name: SD2,
     PaintByExample.name: PaintByExample,
+    QwenImage.name: QwenImage,
+    QwenImageEdit.name: QwenImageEdit,
     InstructPix2Pix.name: InstructPix2Pix,
     Kandinsky22.name: Kandinsky22,
     SDXL.name: SDXL,

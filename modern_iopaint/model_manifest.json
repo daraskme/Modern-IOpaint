@@ -1,0 +1,161 @@
+{
+  "manifest_version": 1,
+  "models": {
+    "qwen-image": {
+      "integrated": true,
+      "backend": "qwen_image",
+      "repo": "nunchaku-ai/nunchaku-qwen-image",
+      "revision": "main",
+      "revision_note": "TODO(P2): replace main with an exact commit hash after running scripts/update_manifest_hashes.py.",
+      "filename_templates": {
+        "none": "svdq-{precision}_{rank}-qwen-image.safetensors",
+        "4": "svdq-{precision}_{rank}-qwen-image-lightningv1.0-4steps.safetensors",
+        "8": "svdq-{precision}_{rank}-qwen-image-lightningv1.1-8steps.safetensors"
+      },
+      "precisions": [
+        "int4",
+        "fp4"
+      ],
+      "ranks": [
+        "r32",
+        "r128"
+      ],
+      "lightning_steps": [
+        0,
+        4,
+        8
+      ],
+      "approx_download_size": "about 30 GiB for one quantized transformer plus base pipeline components",
+      "approx_download_size_bytes": 32212254720,
+      "license_name": "Apache-2.0",
+      "license_url": "https://huggingface.co/nunchaku-ai/nunchaku-qwen-image/blob/main/LICENSE",
+      "gated": false,
+      "allow_patterns": [
+        "{filename}"
+      ],
+      "ignore_patterns": [],
+      "sha256": null,
+      "base": {
+        "repo": "Qwen/Qwen-Image",
+        "revision": "main",
+        "revision_note": "TODO(P2): replace main with an exact commit hash after running scripts/update_manifest_hashes.py.",
+        "approx_download_size_bytes": 19327352832,
+        "license_name": "Apache-2.0",
+        "license_url": "https://huggingface.co/Qwen/Qwen-Image/blob/main/LICENSE",
+        "gated": false,
+        "allow_patterns": [
+          "*"
+        ],
+        "ignore_patterns": [
+          "transformer",
+          "transformer/*"
+        ],
+        "sha256": null
+      }
+    },
+    "qwen-image-edit": {
+      "integrated": true,
+      "backend": "qwen_image_edit",
+      "repo": "nunchaku-ai/nunchaku-qwen-image-edit",
+      "revision": "main",
+      "revision_note": "TODO(P2): replace main with an exact commit hash after running scripts/update_manifest_hashes.py.",
+      "filename_templates": {
+        "none": "svdq-{precision}_{rank}-qwen-image-edit.safetensors",
+        "4": "svdq-{precision}_{rank}-qwen-image-edit-lightningv1.0-4steps.safetensors",
+        "8": "svdq-{precision}_{rank}-qwen-image-edit-lightningv1.0-8steps.safetensors"
+      },
+      "precisions": [
+        "int4",
+        "fp4"
+      ],
+      "ranks": [
+        "r32",
+        "r128"
+      ],
+      "lightning_steps": [
+        0,
+        4,
+        8
+      ],
+      "approx_download_size": "about 32 GiB for one quantized transformer plus base pipeline components",
+      "approx_download_size_bytes": 34359738368,
+      "license_name": "Apache-2.0",
+      "license_url": "https://huggingface.co/nunchaku-ai/nunchaku-qwen-image-edit/blob/main/LICENSE",
+      "gated": false,
+      "allow_patterns": [
+        "{filename}"
+      ],
+      "ignore_patterns": [],
+      "sha256": null,
+      "base": {
+        "repo": "Qwen/Qwen-Image-Edit",
+        "revision": "main",
+        "revision_note": "TODO(P2): replace main with an exact commit hash after running scripts/update_manifest_hashes.py.",
+        "approx_download_size_bytes": 19327352832,
+        "license_name": "Apache-2.0",
+        "license_url": "https://huggingface.co/Qwen/Qwen-Image-Edit/blob/main/LICENSE",
+        "gated": false,
+        "allow_patterns": [
+          "*"
+        ],
+        "ignore_patterns": [
+          "transformer",
+          "transformer/*"
+        ],
+        "sha256": null
+      }
+    },
+    "qwen-image-edit-2509": {
+      "integrated": false,
+      "backend": "qwen_image_edit_2509_placeholder",
+      "repo": "nunchaku-ai/nunchaku-qwen-image-edit-2509",
+      "revision": "main",
+      "revision_note": "TODO(P2): placeholder only; pin an exact revision and enable in a later phase.",
+      "filename_templates": {
+        "none": "svdq-{precision}_{rank}-qwen-image-edit-2509.safetensors",
+        "4": "svdq-{precision}_{rank}-qwen-image-edit-2509-lightningv2.0-4steps.safetensors",
+        "8": "svdq-{precision}_{rank}-qwen-image-edit-2509-lightningv2.0-8steps.safetensors"
+      },
+      "precisions": [
+        "int4",
+        "fp4"
+      ],
+      "ranks": [
+        "r32",
+        "r128"
+      ],
+      "lightning_steps": [
+        0,
+        4,
+        8
+      ],
+      "approx_download_size": "placeholder: about 32 GiB for one quantized transformer plus base pipeline components",
+      "approx_download_size_bytes": 34359738368,
+      "license_name": "Apache-2.0",
+      "license_url": "https://huggingface.co/nunchaku-ai/nunchaku-qwen-image-edit-2509/blob/main/LICENSE",
+      "gated": false,
+      "allow_patterns": [
+        "{filename}"
+      ],
+      "ignore_patterns": [],
+      "sha256": null,
+      "base": {
+        "repo": "Qwen/Qwen-Image-Edit",
+        "revision": "main",
+        "revision_note": "TODO(P2): placeholder only; pin an exact revision in a later phase.",
+        "approx_download_size_bytes": 19327352832,
+        "license_name": "Apache-2.0",
+        "license_url": "https://huggingface.co/Qwen/Qwen-Image-Edit/blob/main/LICENSE",
+        "gated": false,
+        "allow_patterns": [
+          "*"
+        ],
+        "ignore_patterns": [
+          "transformer",
+          "transformer/*"
+        ],
+        "sha256": null
+      }
+    }
+  }
+}

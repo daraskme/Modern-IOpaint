@@ -1,13 +1,15 @@
-from typing import Dict, List
+import gc
+from typing import Dict, List, Optional
 
 import numpy as np
 import torch
 from loguru import logger
 
 from modern_iopaint.download import scan_models
+from modern_iopaint.const import QWEN_IMAGE_EDIT_NAME, QWEN_IMAGE_NAME
 from modern_iopaint.helper import switch_mps_device
 from modern_iopaint.model import ControlNet, SD, SDXL, models
-from modern_iopaint.model.utils import is_local_files_only, torch_gc
+from modern_iopaint.model.utils import is_local_files_only
 from modern_iopaint.schema import InpaintRequest, ModelInfo, ModelType
 
 
@@ -99,16 +101,116 @@ class ModelManager:
         return self.model(image, mask, config).astype(np.uint8)
 
     def scan_models(self) -> List[ModelInfo]:
-        available_models = scan_models()
+        available_models = scan_models(
+            self.kwargs.get("model_cache_dir"),
+            qwen_precision=self.kwargs.get("qwen_precision", "auto"),
+            qwen_rank=self.kwargs.get("qwen_rank", "r32"),
+            qwen_lightning_steps=self.kwargs.get("qwen_lightning_steps", 8),
+        )
         self.available_models = {it.name: it for it in available_models}
         return available_models
+
+    @staticmethod
+    def _is_large_model(model_info: Optional[ModelInfo]) -> bool:
+        if model_info is None:
+            return False
+        return model_info.name in [QWEN_IMAGE_NAME, QWEN_IMAGE_EDIT_NAME] or (
+            model_info.model_type
+            in [
+                ModelType.DIFFUSERS_SD,
+                ModelType.DIFFUSERS_SD_INPAINT,
+                ModelType.DIFFUSERS_SDXL,
+                ModelType.DIFFUSERS_SDXL_INPAINT,
+            ]
+        )
+
+    def _cuda_free_bytes(self) -> Optional[int]:
+        if not torch.cuda.is_available() or str(self.device).split(":", 1)[0] != "cuda":
+            return None
+        try:
+            device_index = self.device.index
+            if device_index is None:
+                device_index = torch.cuda.current_device()
+            free_bytes, _ = torch.cuda.mem_get_info(device_index)
+            return int(free_bytes)
+        except Exception:
+            return None
+
+    @staticmethod
+    def _remove_accelerate_hooks(pipeline) -> None:
+        if pipeline is None:
+            return
+        remove_all_hooks = getattr(pipeline, "remove_all_hooks", None)
+        if callable(remove_all_hooks):
+            try:
+                remove_all_hooks()
+            except Exception as error:
+                logger.debug(f"Pipeline remove_all_hooks failed during teardown: {error}")
+
+        try:
+            from accelerate.hooks import remove_hook_from_module
+        except Exception:
+            return
+
+        components = getattr(pipeline, "components", {})
+        if isinstance(components, dict):
+            modules = components.values()
+        else:
+            modules = []
+        for module in modules:
+            if not isinstance(module, torch.nn.Module):
+                continue
+            try:
+                remove_hook_from_module(module, recurse=True)
+            except Exception as error:
+                logger.debug(f"Accelerate hook removal failed during teardown: {error}")
+
+    def _teardown_current_model(self, *, large_switch: bool = False) -> None:
+        current = getattr(self, "model", None)
+        if current is None:
+            return
+        free_before = self._cuda_free_bytes()
+        pipeline = getattr(current, "model", None)
+        if large_switch:
+            logger.info("Tearing down the current pipeline before loading a large model")
+            self._remove_accelerate_hooks(pipeline)
+
+        try:
+            current.model = None
+        except Exception:
+            pass
+        self.model = None
+        del pipeline
+        del current
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        gc.collect()
+
+        free_after = self._cuda_free_bytes()
+        if free_before is not None and free_after is not None:
+            freed_gib = max(0, free_after - free_before) / (1024**3)
+            logger.info("Pipeline teardown freed {:.2f} GiB of VRAM", freed_gib)
+
+    def unload(self) -> None:
+        """Explicitly release the active backend and its Accelerate hooks."""
+
+        model_info = self.available_models.get(self.name)
+        self._teardown_current_model(large_switch=self._is_large_model(model_info))
 
     def switch(self, new_name: str):
         if new_name == self.name:
             return
+        if new_name not in self.available_models:
+            raise NotImplementedError(
+                f"Unsupported model: {new_name}. Available models: "
+                f"{list(self.available_models.keys())}"
+            )
 
         old_name = self.name
         old_controlnet_method = self.controlnet_method
+        old_model_info = self.available_models.get(old_name)
+        new_model_info = self.available_models[new_name]
         self.name = new_name
 
         if (
@@ -118,8 +220,12 @@ class ModelManager:
         ):
             self.controlnet_method = self.available_models[new_name].controlnets[0]
         try:
-            del self.model
-            torch_gc()
+            self._teardown_current_model(
+                large_switch=(
+                    self._is_large_model(old_model_info)
+                    or self._is_large_model(new_model_info)
+                )
+            )
 
             self.model = self.init_model(
                 new_name, switch_mps_device(new_name, self.device), **self.kwargs
@@ -128,6 +234,9 @@ class ModelManager:
             self.name = old_name
             self.controlnet_method = old_controlnet_method
             logger.info(f"Switch model from {old_name} to {new_name} failed, rollback")
+            gc.collect()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
             self.model = self.init_model(
                 old_name, switch_mps_device(old_name, self.device), **self.kwargs
             )
@@ -210,4 +319,3 @@ class ModelManager:
         elif lcm_lora_loaded:
             logger.info("Disable LCM LoRA")
             pipe.disable_lora()
-

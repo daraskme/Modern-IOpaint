@@ -326,6 +326,8 @@ const defaultValues: AppState = {
       support_lcm_lora: false,
       is_single_file_diffusers: false,
       need_prompt: false,
+      default_steps: null,
+      default_guidance_scale: null,
     },
     showCropper: false,
     showExtender: false,
@@ -856,6 +858,13 @@ export const useStore = createWithEqualityFn<AppState & AppAction>()(
       setModel: (newModel: ModelInfo) => {
         set((state) => {
           state.settings.model = newModel
+
+          if (newModel.default_steps != null) {
+            state.settings.sdSteps = newModel.default_steps
+          }
+          if (newModel.default_guidance_scale != null) {
+            state.settings.sdGuidanceScale = newModel.default_guidance_scale
+          }
 
           if (
             newModel.support_controlnet &&

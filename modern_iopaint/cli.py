@@ -1,4 +1,5 @@
 import webbrowser
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional
@@ -16,6 +17,22 @@ from modern_iopaint.schema import InteractiveSegModel, Device, RealESRGANModel, 
 typer_app = typer.Typer(pretty_exceptions_show_locals=False, add_completion=False)
 
 
+def validate_qwen_options(
+    precision: str, rank: str, lightning_steps: int, runtime_profile: str = "auto"
+):
+    if precision not in ("auto", "int4", "fp4"):
+        raise typer.BadParameter("must be auto, int4, or fp4", param_hint="qwen-precision")
+    if rank not in ("r32", "r128"):
+        raise typer.BadParameter("must be r32 or r128", param_hint="qwen-rank")
+    if lightning_steps not in (0, 4, 8):
+        raise typer.BadParameter("must be 0, 4, or 8", param_hint="qwen-lightning-steps")
+    if runtime_profile not in ("auto", "fast", "balanced", "conservative"):
+        raise typer.BadParameter(
+            "must be auto, fast, balanced, or conservative",
+            param_hint="runtime-profile",
+        )
+
+
 @typer_app.command(help="Install all plugins dependencies")
 def install_plugins_packages():
     from modern_iopaint.installer import install_plugins_package
@@ -23,7 +40,7 @@ def install_plugins_packages():
     install_plugins_package()
 
 
-@typer_app.command(help="Download SD/SDXL normal/inpainting model from HuggingFace")
+@typer_app.command(help="Download a manifest Qwen model or SD/SDXL model from Hugging Face")
 def download(
     model: str = Option(
         ..., help="Model id on HuggingFace e.g: runwayml/stable-diffusion-inpainting"
@@ -34,10 +51,24 @@ def download(
         file_okay=False,
         callback=setup_model_dir,
     ),
+    qwen_precision: str = Option(
+        "auto", envvar="MODERN_IOPAINT_QWEN_PRECISION"
+    ),
+    qwen_rank: str = Option("r32", envvar="MODERN_IOPAINT_QWEN_RANK"),
+    qwen_lightning_steps: int = Option(
+        8, envvar="MODERN_IOPAINT_QWEN_LIGHTNING_STEPS"
+    ),
 ):
     from modern_iopaint.download import cli_download_model
 
-    cli_download_model(model)
+    validate_qwen_options(qwen_precision, qwen_rank, qwen_lightning_steps)
+    cli_download_model(
+        model,
+        precision=qwen_precision,
+        rank=qwen_rank,
+        lightning_steps=qwen_lightning_steps,
+        cache_dir=model_dir,
+    )
 
 
 @typer_app.command(name="list", help="List downloaded models")
@@ -48,10 +79,23 @@ def list_model(
         file_okay=False,
         callback=setup_model_dir,
     ),
+    qwen_precision: str = Option(
+        "auto", envvar="MODERN_IOPAINT_QWEN_PRECISION"
+    ),
+    qwen_rank: str = Option("r32", envvar="MODERN_IOPAINT_QWEN_RANK"),
+    qwen_lightning_steps: int = Option(
+        8, envvar="MODERN_IOPAINT_QWEN_LIGHTNING_STEPS"
+    ),
 ):
     from modern_iopaint.download import scan_models
 
-    scanned_models = scan_models()
+    validate_qwen_options(qwen_precision, qwen_rank, qwen_lightning_steps)
+    scanned_models = scan_models(
+        model_dir,
+        qwen_precision=qwen_precision,
+        qwen_rank=qwen_rank,
+        qwen_lightning_steps=qwen_lightning_steps,
+    )
     for it in scanned_models:
         print(it.name)
 
@@ -81,17 +125,54 @@ def run(
         file_okay=False,
         callback=setup_model_dir,
     ),
+    qwen_precision: str = Option(
+        "auto", envvar="MODERN_IOPAINT_QWEN_PRECISION"
+    ),
+    qwen_rank: str = Option("r32", envvar="MODERN_IOPAINT_QWEN_RANK"),
+    qwen_lightning_steps: int = Option(
+        8, envvar="MODERN_IOPAINT_QWEN_LIGHTNING_STEPS"
+    ),
+    runtime_profile: str = Option(
+        "auto", envvar="MODERN_IOPAINT_RUNTIME_PROFILE"
+    ),
 ):
     from modern_iopaint.download import cli_download_model, scan_models
 
-    scanned_models = scan_models()
+    validate_qwen_options(
+        qwen_precision, qwen_rank, qwen_lightning_steps, runtime_profile
+    )
+    scanned_models = scan_models(
+        model_dir,
+        qwen_precision=qwen_precision,
+        qwen_rank=qwen_rank,
+        qwen_lightning_steps=qwen_lightning_steps,
+    )
     if model not in [it.name for it in scanned_models]:
         logger.info(f"{model} not found in {model_dir}, try to downloading")
-        cli_download_model(model)
+        cli_download_model(
+            model,
+            precision=qwen_precision,
+            rank=qwen_rank,
+            lightning_steps=qwen_lightning_steps,
+            cache_dir=model_dir,
+        )
 
     from modern_iopaint.batch_processing import batch_inpaint
 
-    batch_inpaint(model, device, image, mask, output, config, concat)
+    batch_inpaint(
+        model,
+        device,
+        image,
+        mask,
+        output,
+        config,
+        concat,
+        model_cache_dir=model_dir,
+        qwen_precision=qwen_precision,
+        qwen_rank=qwen_rank,
+        qwen_lightning_steps=qwen_lightning_steps,
+        runtime_profile=runtime_profile,
+    )
 
 
 @typer_app.command(help="Start IOPaint server")
@@ -143,12 +224,25 @@ def start(
     gfpgan_device: Device = Option(Device.cpu),
     enable_restoreformer: bool = Option(False),
     restoreformer_device: Device = Option(Device.cpu),
+    qwen_precision: str = Option(
+        "auto", envvar="MODERN_IOPAINT_QWEN_PRECISION"
+    ),
+    qwen_rank: str = Option("r32", envvar="MODERN_IOPAINT_QWEN_RANK"),
+    qwen_lightning_steps: int = Option(
+        8, envvar="MODERN_IOPAINT_QWEN_LIGHTNING_STEPS"
+    ),
+    runtime_profile: str = Option(
+        "auto", envvar="MODERN_IOPAINT_RUNTIME_PROFILE"
+    ),
 ):
     dump_environment_info()
     device = check_device(device)
     remove_bg_device = check_device(remove_bg_device)
     realesrgan_device = check_device(realesrgan_device)
     gfpgan_device = check_device(gfpgan_device)
+    validate_qwen_options(
+        qwen_precision, qwen_rank, qwen_lightning_steps, runtime_profile
+    )
 
     if input and not input.exists():
         logger.error(f"invalid --input: {input} not exists")
@@ -178,10 +272,21 @@ def start(
 
     from modern_iopaint.download import cli_download_model, scan_models
 
-    scanned_models = scan_models()
+    scanned_models = scan_models(
+        model_dir,
+        qwen_precision=qwen_precision,
+        qwen_rank=qwen_rank,
+        qwen_lightning_steps=qwen_lightning_steps,
+    )
     if model not in [it.name for it in scanned_models]:
         logger.info(f"{model} not found in {model_dir}, try to downloading")
-        cli_download_model(model)
+        cli_download_model(
+            model,
+            precision=qwen_precision,
+            rank=qwen_rank,
+            lightning_steps=qwen_lightning_steps,
+            cache_dir=model_dir,
+        )
 
     from modern_iopaint.api import Api
     from modern_iopaint.schema import ApiConfig
@@ -224,6 +329,11 @@ def start(
         gfpgan_device=gfpgan_device,
         enable_restoreformer=enable_restoreformer,
         restoreformer_device=restoreformer_device,
+        model_dir=model_dir,
+        qwen_precision=qwen_precision,
+        qwen_rank=qwen_rank,
+        qwen_lightning_steps=qwen_lightning_steps,
+        runtime_profile=runtime_profile,
     )
     print(api_config.model_dump_json(indent=4))
     api = Api(app, api_config)
