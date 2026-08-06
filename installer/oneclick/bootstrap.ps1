@@ -15,6 +15,7 @@ $ProgressPreference = "SilentlyContinue"
 
 $InstallRoot = $PSScriptRoot
 $ToolsDir = Join-Path $InstallRoot "tools"
+$env:UV_PYTHON_INSTALL_DIR = Join-Path $InstallRoot "tools\python"
 $EnvDir = Join-Path $InstallRoot "env"
 $LogPath = Join-Path $InstallRoot "setup.log"
 $UvArchive = Join-Path $ToolsDir "uv-windows.zip"

@@ -26,6 +26,12 @@ Modern-IOPaint 本体の wheel は daraskme/Modern-IOpaint の最新 GitHub Rele
 再実行しても既存の環境を利用し、壊れた/古いパッケージを修復・更新します。
 失敗時は画面のメッセージと setup.log を確認してください。
 
+アンインストール:
+ワンクリックインストール用フォルダーを削除すると、uv が管理する Python
+インタープリターを含むすべてのインストール内容が削除されます。ただし、
+Hugging Face のモデルキャッシュと pip/uv のパッケージキャッシュは、
+ユーザーごとの既定のグローバル保存先に残ります。
+
 開発者向けローカル wheel テスト:
   run.bat -LocalWheel "C:\path\to\modern_iopaint-<version>-py3-none-any.whl"
 
@@ -59,6 +65,12 @@ Usage:
 It is safe to run the bootstrap again: it reuses the environment and repairs
 or updates outdated packages. If setup fails, read the console message and
 setup.log.
+
+Uninstall:
+Delete the one-click install folder to remove everything installed there,
+including the uv-managed Python interpreter. The Hugging Face model cache and
+pip/uv package caches are exceptions and remain in their default user-global
+locations.
 
 Local wheel test for maintainers:
   run.bat -LocalWheel "C:\path\to\modern_iopaint-<version>-py3-none-any.whl"

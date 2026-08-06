@@ -400,6 +400,14 @@ directory for Python minor version link`. The bootstrap pins the known-working
 exact patch version 3.12.10 instead of the 3.12 minor version so uv does not
 enter the faulty minor-version link path.
 
+Further E2E testing found that MSIX AppData virtualization breaks the junction
+targets in uv's default user-global `%APPDATA%\uv\python` directory, causing
+the same missing-target failure mode. The bootstrap therefore scopes
+`UV_PYTHON_INSTALL_DIR` to `tools\python` inside the one-click install folder.
+This keeps the managed interpreter self-contained with the installation and
+makes a full uninstall easier, while uv's package and download caches remain in
+their default user-global locations.
+
 GitHub Actions now runs Ruff checks and compile-only smoke tests on Windows and
 Linux, builds the frontend and wheel without loading models or requiring a GPU,
 and uploads the wheel. `v*` tags build wheel, sdist, and one-click artifacts,
