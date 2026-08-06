@@ -364,7 +364,7 @@ sequence.
 
 ## Phase P6: distribution, bootstrap, CI, and documentation
 
-P6 makes the modernized fork distributable as a PyPI wheel and a Windows
+P6 makes the modernized fork distributable as a Python wheel and a Windows
 online-bootstrap archive. Hatch now force-includes the compiled frontend from
 `web_app/dist` as `modern_iopaint/web_app` without a copy step. A custom wheel
 build hook rejects a missing or incomplete frontend with the exact commands
@@ -388,19 +388,24 @@ otherwise while retaining explicit overrides.
 idempotent, transcript-logged PowerShell bootstrap. It checks the NVIDIA driver
 and 45 GB disk budget, downloads a version/hash-pinned uv Windows archive,
 creates a uv-managed Python 3.12 environment, installs the application (from
-PyPI or a local test wheel), enforces CUDA 12.8 torch, runs `setup-gpu`, and
-starts Qwen Image in the browser. The uv version, URL, and hash are explicit
+the latest `daraskme/Modern-IOpaint` GitHub Release or a local test wheel),
+enforces CUDA 12.8 torch, runs `setup-gpu`, and starts Qwen Image in the browser.
+Dependencies continue to resolve from PyPI. The uv version, URL, and hash are explicit
 placeholders that the maintainer fills with `scripts/update_oneclick_pins.py`;
 `scripts/build_oneclick_zip.py` creates the versioned release ZIP.
 
 GitHub Actions now runs Ruff checks and compile-only smoke tests on Windows and
 Linux, builds the frontend and wheel without loading models or requiring a GPU,
 and uploads the wheel. `v*` tags build wheel, sdist, and one-click artifacts,
-create a GitHub Release, and publish through PyPI Trusted Publishing behind a
-documented protected environment. The bilingual README is rewritten Japanese
+create a GitHub Release, and publish through PyPI Trusted Publishing only when
+the `PYPI_PUBLISH_ENABLED` repository variable is `true`. The bilingual README is rewritten Japanese
 first with an English mirror, current installation paths, requirements,
 features, license boundaries, benchmark placeholders, development guidance,
 and unchanged fork attribution.
+
+For the first public pre-release, the project version is `0.1.0b1`. Until PyPI
+publishing is configured, GitHub Release wheels are the interim default install
+source; direct installation of Modern-IOPaint from PyPI will be enabled later.
 
 P6 was implemented under a static-only constraint. No Python, npm, pip, uv,
 Git, network operation, build, test, or workflow was executed in-session; all

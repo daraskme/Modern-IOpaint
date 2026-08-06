@@ -71,9 +71,10 @@ jobs:
   publish-pypi:
     name: Publish to PyPI
     needs: build
+    # TODO(repo owner): Once PyPI Trusted Publishing or credentials are configured,
+    # set the repository variable PYPI_PUBLISH_ENABLED to `true` to enable this job.
+    if: ${{ vars.PYPI_PUBLISH_ENABLED == 'true' }}
     runs-on: ubuntu-latest
-    # TODO(repo owner): Create a protected GitHub environment named `pypi` and
-    # require reviewers there before enabling production releases.
     environment:
       name: pypi
       url: https://pypi.org/project/modern-iopaint/

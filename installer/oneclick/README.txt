@@ -5,6 +5,10 @@ Modern-IOPaint Windows ワンクリック・オンラインブートストラッ
 インターネットから uv、Python 3.12、Modern-IOPaint、CUDA 12.8 用 PyTorch、
 Nunchaku、および選択したモデルをダウンロードします。
 
+Modern-IOPaint 本体の wheel は daraskme/Modern-IOpaint の最新 GitHub Release
+から取得し、依存関係は PyPI から取得します。Modern-IOPaint 本体の PyPI からの
+インストールは、公開準備が完了した後に提供予定です。
+
 必要条件:
 - Windows x64 と NVIDIA GPU
 - CUDA 12.8 をサポートする NVIDIA ドライバー
@@ -32,6 +36,10 @@ Modern-IOPaint Windows one-click online bootstrap
 This is not an offline installer. Double-clicking run.bat downloads uv,
 Python 3.12, Modern-IOPaint, CUDA 12.8 PyTorch, Nunchaku, and the selected
 models from the internet.
+
+The Modern-IOPaint wheel is installed from the latest GitHub Release for
+daraskme/Modern-IOpaint, while dependencies still come from PyPI. Installing
+Modern-IOPaint itself from PyPI will be available later, after publishing is ready.
 
 Requirements:
 - 64-bit Windows and an NVIDIA GPU

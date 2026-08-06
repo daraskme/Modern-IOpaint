@@ -6,6 +6,8 @@ param(
 $UvVersion = "0.12.2"
 $UvUrl = "https://github.com/astral-sh/uv/releases/download/0.12.2/uv-x86_64-pc-windows-msvc.zip"
 $UvSha256 = "01442d8ce5c7124151a73e697c836d252c6da853c18c73206d3cc4c2378a91d2"
+$LatestReleaseApiUrl = "https://api.github.com/repos/daraskme/Modern-IOpaint/releases/latest"
+$ReleasesPageUrl = "https://github.com/daraskme/Modern-IOpaint/releases"
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
@@ -140,7 +142,25 @@ try {
         Invoke-Checked "Installing Modern-IOPaint from local wheel" $UvExe @("pip", "install", "--python", $PythonExe, "--upgrade", "--force-reinstall", $ResolvedWheel)
     }
     else {
-        Invoke-Checked "Installing/updating Modern-IOPaint from PyPI" $UvExe @("pip", "install", "--python", $PythonExe, "--upgrade", "modern-iopaint")
+        Write-Host "Retrieving the latest Modern-IOPaint GitHub Release"
+        try {
+            $LatestRelease = Invoke-RestMethod -UseBasicParsing -Uri $LatestReleaseApiUrl -Headers @{ Accept = "application/vnd.github+json" }
+        }
+        catch {
+            throw "Unable to retrieve the latest Modern-IOPaint GitHub Release. Ensure a published release exists at $ReleasesPageUrl and retry. The release must include a modern_iopaint-*.whl asset. Details: $($_.Exception.Message)"
+        }
+
+        $WheelAsset = @(
+            $LatestRelease.assets | Where-Object { $_.name -like "modern_iopaint-*.whl" }
+        ) | Select-Object -First 1
+        if (-not $WheelAsset) {
+            throw "The latest Modern-IOPaint GitHub Release does not contain a modern_iopaint-*.whl asset. Attach the built wheel to the release at $ReleasesPageUrl and retry."
+        }
+
+        $ReleaseWheel = Join-Path $ToolsDir ([System.IO.Path]::GetFileName([string]$WheelAsset.name))
+        Write-Host "Downloading $($WheelAsset.name) from the latest GitHub Release"
+        Invoke-WebRequest -UseBasicParsing -Uri ([string]$WheelAsset.browser_download_url) -OutFile $ReleaseWheel
+        Invoke-Checked "Installing/updating Modern-IOPaint from GitHub Release" $UvExe @("pip", "install", "--python", $PythonExe, "--upgrade", $ReleaseWheel)
     }
 
     Invoke-Checked "Installing torch CUDA 12.8 runtime" $UvExe @("pip", "install", "--python", $PythonExe, "--torch-backend=cu128", "torch~=2.11.0", "torchvision~=0.26.0")
