@@ -12,3 +12,6 @@ venv/
 .uv-bin/
 tmp/
 modern_iopaint/web_app/
+installer/oneclick/env/
+installer/oneclick/tools/
+installer/oneclick/setup.log
