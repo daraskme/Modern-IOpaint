@@ -394,6 +394,12 @@ Dependencies continue to resolve from PyPI. The uv version, URL, and hash are ex
 placeholders that the maintainer fills with `scripts/update_oneclick_pins.py`;
 `scripts/build_oneclick_zip.py` creates the versioned release ZIP.
 
+uv 0.12.2 has a Windows bug when `uv python install 3.12` resolves to
+`cpython-3.12.13`: after downloading it, uv fails with `Missing expected target
+directory for Python minor version link`. The bootstrap pins the known-working
+exact patch version 3.12.10 instead of the 3.12 minor version so uv does not
+enter the faulty minor-version link path.
+
 GitHub Actions now runs Ruff checks and compile-only smoke tests on Windows and
 Linux, builds the frontend and wheel without loading models or requiring a GPU,
 and uploads the wheel. `v*` tags build wheel, sdist, and one-click artifacts,

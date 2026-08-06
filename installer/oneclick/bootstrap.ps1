@@ -6,6 +6,7 @@ param(
 $UvVersion = "0.12.2"
 $UvUrl = "https://github.com/astral-sh/uv/releases/download/0.12.2/uv-x86_64-pc-windows-msvc.zip"
 $UvSha256 = "01442d8ce5c7124151a73e697c836d252c6da853c18c73206d3cc4c2378a91d2"
+$PythonVersion = "3.12.10"
 $LatestReleaseApiUrl = "https://api.github.com/repos/daraskme/Modern-IOpaint/releases/latest"
 $ReleasesPageUrl = "https://github.com/daraskme/Modern-IOpaint/releases"
 Set-StrictMode -Version Latest
@@ -30,9 +31,11 @@ function Invoke-Checked {
         [Parameter(Mandatory = $true)][string[]]$Arguments
     )
     Write-Host "`n==> $Description" -ForegroundColor Cyan
+    $ErrorActionPreference = "Continue"
     & $FilePath @Arguments
-    if ($LASTEXITCODE -ne 0) {
-        throw "$Description failed with exit code $LASTEXITCODE."
+    $ProcessExitCode = $LASTEXITCODE
+    if ($ProcessExitCode -ne 0) {
+        throw "$Description failed with exit code $ProcessExitCode."
     }
 }
 
@@ -119,7 +122,7 @@ try {
     Copy-Item -LiteralPath $ExtractedUv.FullName -Destination $UvExe -Force
     $env:PATH = "$ToolsDir;$env:PATH"
 
-    Invoke-Checked "Installing uv-managed Python 3.12" $UvExe @("python", "install", "3.12")
+    Invoke-Checked "Installing uv-managed Python $PythonVersion" $UvExe @("python", "install", $PythonVersion)
 
     $CreateEnvironment = -not (Test-Path -LiteralPath $PythonExe)
     if (-not $CreateEnvironment) {
@@ -127,11 +130,11 @@ try {
         $PythonProbeExitCode = $LASTEXITCODE
         $ExistingPython = ($ExistingPythonOutput -join "").Trim()
         if ($PythonProbeExitCode -ne 0 -or $ExistingPython -ne "3.12") {
-            Invoke-Checked "Repairing the virtual environment with Python 3.12" $UvExe @("venv", "--python", "3.12", "--clear", $EnvDir)
+            Invoke-Checked "Repairing the virtual environment with Python $PythonVersion" $UvExe @("venv", "--python", $PythonVersion, "--clear", $EnvDir)
         }
     }
     else {
-        Invoke-Checked "Creating the virtual environment with Python 3.12" $UvExe @("venv", "--python", "3.12", $EnvDir)
+        Invoke-Checked "Creating the virtual environment with Python $PythonVersion" $UvExe @("venv", "--python", $PythonVersion, $EnvDir)
     }
 
     if ($LocalWheel) {

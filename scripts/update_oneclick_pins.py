@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Download a selected uv Windows release asset and pin it in bootstrap.ps1."""
+"""Download a selected uv Windows release asset and update bootstrap pins."""
 
 from __future__ import annotations
 
@@ -39,7 +39,9 @@ def replace_assignment(text: str, variable: str, value: str) -> str:
     return updated
 
 
-def update_bootstrap(bootstrap_path: Path, version: str, url: str) -> None:
+def update_bootstrap(
+    bootstrap_path: Path, version: str, url: str, python_version: str
+) -> None:
     with tempfile.TemporaryDirectory(prefix="modern-iopaint-uv-pin-") as temp_dir:
         archive_path = Path(temp_dir) / "uv-windows.zip"
         print(f"Downloading {url}", flush=True)
@@ -53,8 +55,12 @@ def update_bootstrap(bootstrap_path: Path, version: str, url: str) -> None:
     text = replace_assignment(text, "UvVersion", version)
     text = replace_assignment(text, "UvUrl", url)
     text = replace_assignment(text, "UvSha256", sha256)
+    text = replace_assignment(text, "PythonVersion", python_version)
     bootstrap_path.write_text(text, encoding="utf-8")
-    print(f"Pinned uv {version} ({sha256}) in {bootstrap_path}")
+    print(
+        f"Pinned uv {version} ({sha256}) and Python {python_version} "
+        f"in {bootstrap_path}"
+    )
 
 
 def main() -> None:
@@ -63,6 +69,11 @@ def main() -> None:
         "--version",
         required=True,
         help="exact uv GitHub release tag chosen by the maintainer",
+    )
+    parser.add_argument(
+        "--python-version",
+        required=True,
+        help="exact uv-managed Python patch version chosen by the maintainer",
     )
     parser.add_argument(
         "--url",
@@ -76,7 +87,7 @@ def main() -> None:
     )
     args = parser.parse_args()
     url = args.url or UV_ASSET_TEMPLATE.format(version=args.version)
-    update_bootstrap(args.bootstrap.resolve(), args.version, url)
+    update_bootstrap(args.bootstrap.resolve(), args.version, url, args.python_version)
 
 
 if __name__ == "__main__":
