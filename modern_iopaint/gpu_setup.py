@@ -17,10 +17,9 @@ import sys
 import tempfile
 import urllib.error
 import urllib.request
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Sequence
-
 
 CUDA_VERSION = (12, 8)
 MIN_FREE_BYTES = 10 * 1024**3

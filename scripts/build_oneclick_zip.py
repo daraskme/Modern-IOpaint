@@ -4,10 +4,10 @@
 from __future__ import annotations
 
 import re
-import tomllib
 import zipfile
 from pathlib import Path
 
+import tomllib
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 SOURCE_DIR = REPOSITORY_ROOT / "installer" / "oneclick"

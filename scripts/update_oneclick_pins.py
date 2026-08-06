@@ -11,7 +11,6 @@ import urllib.request
 import zipfile
 from pathlib import Path
 
-
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_BOOTSTRAP = REPOSITORY_ROOT / "installer" / "oneclick" / "bootstrap.ps1"
 UV_ASSET_TEMPLATE = (
