@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "package": "nunchaku",
+  "version": "1.2.1",
+  "cuda": "12.8",
+  "torch": "2.11",
+  "wheels": [
+    {
+      "python_tag": "cp310",
+      "platform_tag": "win_amd64",
+      "filename": "nunchaku-1.2.1+cu12.8torch2.11-cp310-cp310-win_amd64.whl",
+      "url": "https://github.com/nunchaku-ai/nunchaku/releases/download/v1.2.1/nunchaku-1.2.1%2Bcu12.8torch2.11-cp310-cp310-win_amd64.whl",
+      "sha256": "2df030aa828e1101a8d37c526dcf68b7005abfd9d62e1f70e0d3799ae59c264b"
+    },
+    {
+      "python_tag": "cp311",
+      "platform_tag": "win_amd64",
+      "filename": "nunchaku-1.2.1+cu12.8torch2.11-cp311-cp311-win_amd64.whl",
+      "url": "https://github.com/nunchaku-ai/nunchaku/releases/download/v1.2.1/nunchaku-1.2.1%2Bcu12.8torch2.11-cp311-cp311-win_amd64.whl",
+      "sha256": "ad8ae71896324204cadd27fffbfacf4b716bd19ab49bac2d24fc3438a6b51fe8"
+    },
+    {
+      "python_tag": "cp312",
+      "platform_tag": "win_amd64",
+      "filename": "nunchaku-1.2.1+cu12.8torch2.11-cp312-cp312-win_amd64.whl",
+      "url": "https://github.com/nunchaku-ai/nunchaku/releases/download/v1.2.1/nunchaku-1.2.1%2Bcu12.8torch2.11-cp312-cp312-win_amd64.whl",
+      "sha256": "6de1dce83ec3845901f775a92209c5d81a7d9048b66cbd9933b9d6e7c1c94be9"
+    },
+    {
+      "python_tag": "cp313",
+      "platform_tag": "win_amd64",
+      "filename": "nunchaku-1.2.1+cu12.8torch2.11-cp313-cp313-win_amd64.whl",
+      "url": "https://github.com/nunchaku-ai/nunchaku/releases/download/v1.2.1/nunchaku-1.2.1%2Bcu12.8torch2.11-cp313-cp313-win_amd64.whl",
+      "sha256": "20b95cb6415bdc71c65afeb9d401d03e8d7629534987196d235cb865343929cb"
+    },
+    {
+      "python_tag": "cp310",
+      "platform_tag": "linux_x86_64",
+      "filename": "nunchaku-1.2.1+cu12.8torch2.11-cp310-cp310-linux_x86_64.whl",
+      "url": "https://github.com/nunchaku-ai/nunchaku/releases/download/v1.2.1/nunchaku-1.2.1%2Bcu12.8torch2.11-cp310-cp310-linux_x86_64.whl",
+      "sha256": "31c67c19187f9226196906784aaaef5f81b84aec932e2bced99ff35f342c7d07"
+    },
+    {
+      "python_tag": "cp311",
+      "platform_tag": "linux_x86_64",
+      "filename": "nunchaku-1.2.1+cu12.8torch2.11-cp311-cp311-linux_x86_64.whl",
+      "url": "https://github.com/nunchaku-ai/nunchaku/releases/download/v1.2.1/nunchaku-1.2.1%2Bcu12.8torch2.11-cp311-cp311-linux_x86_64.whl",
+      "sha256": "e7fdf749054bd8f018655de58a9ba5faef5e9120b01bede4608fc958443fc410"
+    },
+    {
+      "python_tag": "cp312",
+      "platform_tag": "linux_x86_64",
+      "filename": "nunchaku-1.2.1+cu12.8torch2.11-cp312-cp312-linux_x86_64.whl",
+      "url": "https://github.com/nunchaku-ai/nunchaku/releases/download/v1.2.1/nunchaku-1.2.1%2Bcu12.8torch2.11-cp312-cp312-linux_x86_64.whl",
+      "sha256": "962eaabc7be74299678d83719e3589e97136c91752d61227ef1f55a3b50b32d4"
+    },
+    {
+      "python_tag": "cp313",
+      "platform_tag": "linux_x86_64",
+      "filename": "nunchaku-1.2.1+cu12.8torch2.11-cp313-cp313-linux_x86_64.whl",
+      "url": "https://github.com/nunchaku-ai/nunchaku/releases/download/v1.2.1/nunchaku-1.2.1%2Bcu12.8torch2.11-cp313-cp313-linux_x86_64.whl",
+      "sha256": "149e9d8ec015a9c63f384c271a894ce667171325468271c9536d888ec7af5c2e"
+    }
+  ]
+}

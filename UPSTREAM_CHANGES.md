@@ -10,9 +10,9 @@ The primary target is Python 3.12, while project metadata allows Python
 
 - `torch~=2.11.0`
 - `diffusers==0.36.0`
-- `transformers==5.14.1`
+- `transformers==4.57.6`
 - `accelerate==1.14.0`
-- `huggingface_hub==1.26.0`
+- `huggingface_hub==0.36.2`
 - `peft==0.20.0`
 - `fastapi>=0.141.1,<1`
 - `pydantic>=2.13.4,<3`
@@ -25,8 +25,12 @@ Qwen transformer calls `QwenEmbedRope` with the 0.36 signature
 `pos_embed(img_shapes, txt_seq_lens, device=...)`. Diffusers 0.39 changes that
 signature and fails with a duplicate `device` argument; 0.37 and 0.38 pass no
 usable text sequence length and fail validation. Nunchaku's own CI also pins
-Diffusers 0.36. `transformers==5.14.1` is retained from the researched P1 tuple.
-Gradio and `controlnet-aux` were removed from core dependencies.
+Diffusers 0.36. `transformers==4.57.6` is retained from the verified P1 tuple.
+`huggingface_hub==0.36.2` is pinned because Transformers 4.57.6 requires
+`huggingface-hub<1.0`; the prior Hub 1.26.0 pin made fresh-install dependency
+resolution fail. Hub 0.36.2 was verified by the operator with passing
+`smoke_p1 --gpu`, `smoke_p2`, and `smoke_p4` runs. Gradio and `controlnet-aux`
+were removed from core dependencies.
 
 ### Quarantined features
 
@@ -313,3 +317,91 @@ P4 runtime verification found that Transformers 5.x is incompatible with
 Diffusers 0.36 single-file CLIP conversion during `from_single_file`.
 Transformers is therefore pinned to `4.57.6`, which has been verified working
 across the P1, P2, and P3 smoke suites.
+
+## Phase P5: static VRAM benchmark harness
+
+P5 adds `scripts/bench_vram.py` and the `benchmarks/` results directory. The
+offline harness benchmarks LaMa, AnimeLaMa, MIGAN, Qwen Image, Qwen Image Edit,
+and FLUX.1-Fill-dev at 512, 1024, and 2048 under the explicit `fast` and
+`conservative` runtime profiles. An optional local SDXL `.ckpt` or
+`.safetensors` file can be included with `--checkpoint`. The `--quick` preset
+runs Qwen Image and LaMa at 1024 for iteration, while `--full` runs the complete
+matrix.
+
+Every cell performs one warmup and reports the second generation as its
+steady-state wall time. Model initialization or switching is timed separately.
+The report also records PyTorch peak allocated and reserved CUDA memory, driver
+free/total VRAM before and after the cell, sampled process peak RSS, and the
+effective inference settings. CUDA peak statistics are reset between cells.
+The harness uses the real `ModelManager` initialization, `switch()`, and
+`unload()` residency path. Missing local weights or unavailable Nunchaku support
+produce explicit `SKIP` rows and never trigger a download.
+
+At 2048, erase backends use `HDStrategy.CROP` around a realistic connected mask.
+Diffusion backends additionally use the application's `use_croper` request path
+with a centered 1024px crop, so Qwen, FLUX, and optional SDXL do not perform
+unsupported direct full-resolution inference. Generated reports are written as
+`benchmarks/results-<timestamp>.md` and include GPU, driver, VRAM/RAM, selected
+int4/fp4 precision, optional cap, and the complete Python 3.12 / torch
+2.11+cu128 / Diffusers 0.36.0 / Transformers 4.57.6 / Nunchaku 1.2.1 tuple.
+
+`--cap-gib` applies `torch.cuda.set_per_process_memory_fraction` before model
+discovery or loading. It is a screening/estimation aid only: it does not emulate
+Windows display-memory reservation, allocator fragmentation, or non-PyTorch
+VRAM consumers.
+
+P5 was implemented under a static-only constraint; no Python process, model
+load, network access, or benchmark run was performed during implementation.
+
+### P5 release gate
+
+Results produced by `--cap-gib` **do not satisfy the project's real-12GB-hardware
+release gate**. That gate requires an actual physical 12 GB Ampere or Ada GPU
+using the int4 path, and ideally also a Blackwell GPU using the fp4 path, on
+Windows with a display attached. Verification must exercise a cold install,
+repeated generations, model switching, and a VRAM-leak check across that full
+sequence.
+
+## Phase P6: distribution, bootstrap, CI, and documentation
+
+P6 makes the modernized fork distributable as a PyPI wheel and a Windows
+online-bootstrap archive. Hatch now force-includes the compiled frontend from
+`web_app/dist` as `modern_iopaint/web_app` without a copy step. A custom wheel
+build hook rejects a missing or incomplete frontend with the exact commands
+needed to build it. Installed packages serve those bundled assets; source
+checkouts fall back to `web_app/dist` with a logged notice.
+
+The new `modern-iopaint setup-gpu` command detects the operating system, Python
+tag, NVIDIA GPU, driver, and optional compute capability. It selects one of the
+bundled Nunchaku 1.2.1 CUDA 12.8/torch 2.11 wheel records for CPython 3.10-3.13
+on Windows or Linux, installs the CUDA 12.8 torch 2.11/torchvision 0.26 pair
+when needed, downloads the selected wheel, and verifies both import and
+`get_precision()`. Nunchaku is always installed with `--no-deps`; allowing its
+declared dependencies to resolve can replace CUDA torch with the latest CPU
+PyPI build and cause Windows DLL load failures. Manifest wheel hashes remain
+empty release-maintainer placeholders until `scripts/update_wheel_hashes.py`
+downloads the release assets and records their SHA-256 values. The primary
+`--device` option now defaults to `auto`, selecting CUDA when available and CPU
+otherwise while retaining explicit overrides.
+
+`installer/oneclick` provides a double-click batch entry point and an
+idempotent, transcript-logged PowerShell bootstrap. It checks the NVIDIA driver
+and 45 GB disk budget, downloads a version/hash-pinned uv Windows archive,
+creates a uv-managed Python 3.12 environment, installs the application (from
+PyPI or a local test wheel), enforces CUDA 12.8 torch, runs `setup-gpu`, and
+starts Qwen Image in the browser. The uv version, URL, and hash are explicit
+placeholders that the maintainer fills with `scripts/update_oneclick_pins.py`;
+`scripts/build_oneclick_zip.py` creates the versioned release ZIP.
+
+GitHub Actions now runs Ruff checks and compile-only smoke tests on Windows and
+Linux, builds the frontend and wheel without loading models or requiring a GPU,
+and uploads the wheel. `v*` tags build wheel, sdist, and one-click artifacts,
+create a GitHub Release, and publish through PyPI Trusted Publishing behind a
+documented protected environment. The bilingual README is rewritten Japanese
+first with an English mirror, current installation paths, requirements,
+features, license boundaries, benchmark placeholders, development guidance,
+and unchanged fork attribution.
+
+P6 was implemented under a static-only constraint. No Python, npm, pip, uv,
+Git, network operation, build, test, or workflow was executed in-session; all
+release and runtime verification remains external.

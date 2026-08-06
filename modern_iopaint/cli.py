@@ -17,6 +17,22 @@ from modern_iopaint.schema import InteractiveSegModel, Device, RealESRGANModel, 
 typer_app = typer.Typer(pretty_exceptions_show_locals=False, add_completion=False)
 
 
+def resolve_device_option(device: str | Device) -> Device:
+    """Resolve the CLI-only auto value while preserving explicit device choices."""
+
+    value = device.value if isinstance(device, Device) else device.lower()
+    if value == "auto":
+        import torch
+
+        return Device.cuda if torch.cuda.is_available() else Device.cpu
+    try:
+        return Device(value)
+    except ValueError as error:
+        raise typer.BadParameter(
+            "must be auto, cpu, cuda, or mps", param_hint="device"
+        ) from error
+
+
 def validate_qwen_options(
     precision: str,
     rank: str,
@@ -46,6 +62,26 @@ def install_plugins_packages():
     from modern_iopaint.installer import install_plugins_package
 
     install_plugins_package()
+
+
+@typer_app.command(
+    name="setup-gpu",
+    help="Install the supported CUDA 12.8 torch and Nunchaku runtime",
+)
+def setup_gpu(
+    dry_run: bool = Option(
+        False,
+        "--dry-run",
+        help="Detect compatibility and print planned commands without changing files",
+    ),
+):
+    from modern_iopaint.gpu_setup import GPUSetupError, run_setup_gpu
+
+    try:
+        run_setup_gpu(dry_run=dry_run, echo=typer.echo)
+    except GPUSetupError as error:
+        typer.echo(str(error), err=True)
+        raise typer.Exit(code=1) from error
 
 
 @typer_app.command(
@@ -180,7 +216,9 @@ def list_model(
 @typer_app.command(help="Batch processing images")
 def run(
     model: str = Option("lama"),
-    device: Device = Option(Device.cpu),
+    device: str = Option(
+        "auto", help="Execution device: auto, cpu, cuda, or mps"
+    ),
     image: Path = Option(..., help="Image folders or file path"),
     mask: Path = Option(
         ...,
@@ -218,6 +256,7 @@ def run(
 ):
     from modern_iopaint.download import cli_download_model, scan_models
 
+    device = check_device(resolve_device_option(device))
     validate_qwen_options(
         qwen_precision,
         qwen_rank,
@@ -285,7 +324,9 @@ def start(
     disable_nsfw_checker: bool = Option(False, help=DISABLE_NSFW_HELP),
     cpu_textencoder: bool = Option(False, help=CPU_TEXTENCODER_HELP),
     local_files_only: bool = Option(False, help=LOCAL_FILES_ONLY_HELP),
-    device: Device = Option(Device.cpu),
+    device: str = Option(
+        "auto", help="Execution device: auto, cpu, cuda, or mps"
+    ),
     input: Optional[Path] = Option(None, help=INPUT_HELP),
     mask_dir: Optional[Path] = Option(
         None, help=MODEL_DIR_HELP, dir_okay=True, file_okay=False
@@ -325,7 +366,7 @@ def start(
     ),
 ):
     dump_environment_info()
-    device = check_device(device)
+    device = check_device(resolve_device_option(device))
     remove_bg_device = check_device(remove_bg_device)
     realesrgan_device = check_device(realesrgan_device)
     gfpgan_device = check_device(gfpgan_device)

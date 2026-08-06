@@ -69,7 +69,28 @@ from modern_iopaint.schema import (
 )
 
 CURRENT_DIR = Path(__file__).parent.absolute().resolve()
-WEB_APP_DIR = CURRENT_DIR / "web_app"
+PACKAGED_WEB_APP_DIR = CURRENT_DIR / "web_app"
+
+
+def resolve_web_app_dir() -> Path:
+    """Prefer wheel assets, with a source-tree fallback for development."""
+
+    if PACKAGED_WEB_APP_DIR.is_dir():
+        return PACKAGED_WEB_APP_DIR
+
+    development_dist = CURRENT_DIR.parent / "web_app" / "dist"
+    if development_dist.is_dir():
+        logger.info(
+            "Packaged frontend assets are absent; serving development assets from {}",
+            development_dist,
+        )
+        return development_dist
+
+    raise RuntimeError(
+        "Frontend assets are missing. Installed wheels must contain "
+        "modern_iopaint/web_app; source checkouts must run `cd web_app && npm ci "
+        "&& npm run build` before starting the server."
+    )
 
 
 def api_middleware(app: FastAPI):
@@ -184,7 +205,7 @@ class Api:
         self.add_api_route("/api/v1/samplers", self.api_samplers, methods=["GET"])
         self.add_api_route("/api/v1/adjust_mask", self.api_adjust_mask, methods=["POST"])
         self.add_api_route("/api/v1/save_image", self.api_save_image, methods=["POST"])
-        self.app.mount("/", StaticFiles(directory=WEB_APP_DIR, html=True), name="assets")
+        self.app.mount("/", StaticFiles(directory=resolve_web_app_dir(), html=True), name="assets")
         # fmt: on
 
         global global_sio
