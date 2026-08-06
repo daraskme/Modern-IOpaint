@@ -1,5 +1,7 @@
 from pathlib import Path
-from typing import Dict
+from typing import Any, Dict
+
+from omegaconf import OmegaConf
 
 CURRENT_DIR = Path(__file__).parent.absolute()
 
@@ -17,3 +19,10 @@ def get_config_files() -> Dict[str, Path]:
         "xl": CURRENT_DIR / "sd_xl_base.yaml",
         "xl_refiner": CURRENT_DIR / "sd_xl_refiner.yaml",
     }
+
+
+def load_original_config(name: str) -> Dict[str, Any]:
+    """Load a legacy Stable Diffusion YAML for Diffusers' current single-file API."""
+    config_path = get_config_files()[name]
+    config = OmegaConf.load(config_path)
+    return OmegaConf.to_container(config, resolve=True)

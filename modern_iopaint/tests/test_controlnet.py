@@ -68,16 +68,16 @@ def test_controlnet_switch(device):
         prompt="a fox sitting on a bench",
         sd_steps=sd_steps,
         enable_controlnet=True,
-        controlnet_method="lllyasviel/control_v11f1p_sd15_depth",
+        controlnet_method="lllyasviel/control_v11p_sd15_inpaint",
     )
 
     assert_equal(
         model,
         cfg,
-        f"controlnet_switch_canny_to_depth_device_{device}.png",
+        f"controlnet_switch_canny_to_inpaint_device_{device}.png",
         img_p=current_dir / "overture-creations-5sI6fQgYIuo.png",
         mask_p=current_dir / "overture-creations-5sI6fQgYIuo_mask.png",
-        fx=1.2
+        fx=1.2,
     )
 
 

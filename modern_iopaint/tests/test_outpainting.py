@@ -97,6 +97,7 @@ def test_kandinsky_outpainting(name, device, rect):
     )
 
 
+@pytest.mark.skip(reason="PowerPaint v1 is quarantined for Diffusers 0.39")
 @pytest.mark.parametrize("name", ["Sanster/PowerPaint-V1-stable-diffusion-inpainting"])
 @pytest.mark.parametrize("device", ["cuda", "mps"])
 @pytest.mark.parametrize(

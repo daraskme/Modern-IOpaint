@@ -14,30 +14,34 @@ from modern_iopaint.const import (
     DIFFUSERS_SD_INPAINT_CLASS_NAME,
     DIFFUSERS_SDXL_CLASS_NAME,
     DIFFUSERS_SDXL_INPAINT_CLASS_NAME,
-    ANYTEXT_NAME,
 )
-from modern_iopaint.model.original_sd_configs import get_config_files
+from modern_iopaint.model.original_sd_configs import load_original_config
+
+
+QUARANTINED_MODEL_NAME_PARTS = ("anytext", "brushnet", "powerpaint")
+
+
+def is_quarantined_model_name(name: str) -> bool:
+    normalized_name = name.lower()
+    return any(part in normalized_name for part in QUARANTINED_MODEL_NAME_PARTS)
 
 
 def cli_download_model(model: str):
     from modern_iopaint.model import models
-    from modern_iopaint.model.utils import handle_from_pretrained_exceptions
 
+    if is_quarantined_model_name(model):
+        raise ValueError(
+            f"Model {model!r} is quarantined for the Diffusers 0.39 migration"
+        )
     if model in models and models[model].is_erase_model:
-        logger.info(f"Downloading {model}...")
-        models[model].download()
-        logger.info("Done.")
-    elif model == ANYTEXT_NAME:
         logger.info(f"Downloading {model}...")
         models[model].download()
         logger.info("Done.")
     else:
         logger.info(f"Downloading model from Huggingface: {model}")
-        from diffusers import DiffusionPipeline
+        from huggingface_hub import snapshot_download
 
-        downloaded_path = handle_from_pretrained_exceptions(
-            DiffusionPipeline.download, pretrained_model_name=model, variant="fp16"
-        )
+        downloaded_path = snapshot_download(repo_id=model)
         logger.info(f"Done. Downloaded to {downloaded_path}")
 
 
@@ -56,9 +60,11 @@ def get_sd_model_type(model_abs_path: str) -> Optional[ModelType]:
         try:
             StableDiffusionInpaintPipeline.from_single_file(
                 model_abs_path,
-                load_safety_checker=False,
+                safety_checker=None,
+                feature_extractor=None,
+                requires_safety_checker=False,
                 num_in_channels=9,
-                original_config_file=get_config_files()["v1"],
+                original_config=load_original_config("v1"),
             )
             model_type = ModelType.DIFFUSERS_SD_INPAINT
         except ValueError as e:
@@ -84,9 +90,8 @@ def get_sdxl_model_type(model_abs_path: str) -> Optional[ModelType]:
         try:
             model = StableDiffusionXLInpaintPipeline.from_single_file(
                 model_abs_path,
-                load_safety_checker=False,
                 num_in_channels=9,
-                original_config_file=get_config_files()["xl"],
+                original_config=load_original_config("xl"),
             )
             if model.unet.config.in_channels == 9:
                 # https://github.com/huggingface/diffusers/issues/6610
@@ -219,9 +224,9 @@ def scan_diffusers_models() -> List[ModelInfo]:
         name = folder_name_to_show_name(it.parent.parent.parent.name)
         if name in diffusers_model_names:
             continue
-        if "PowerPaint" in name:
-            model_type = ModelType.DIFFUSERS_OTHER
-        elif _class_name == DIFFUSERS_SD_CLASS_NAME:
+        if is_quarantined_model_name(name):
+            continue
+        if _class_name == DIFFUSERS_SD_CLASS_NAME:
             model_type = ModelType.DIFFUSERS_SD
         elif _class_name == DIFFUSERS_SD_INPAINT_CLASS_NAME:
             model_type = ModelType.DIFFUSERS_SD_INPAINT
@@ -233,7 +238,6 @@ def scan_diffusers_models() -> List[ModelInfo]:
             "StableDiffusionInstructPix2PixPipeline",
             "PaintByExamplePipeline",
             "KandinskyV22InpaintPipeline",
-            "AnyText",
         ]:
             model_type = ModelType.DIFFUSERS_OTHER
         else:
@@ -271,6 +275,8 @@ def _scan_converted_diffusers_models(cache_dir) -> List[ModelInfo]:
             _class_name = data["_class_name"]
             name = folder_name_to_show_name(it.parent.name)
             if name in diffusers_model_names:
+                continue
+            if is_quarantined_model_name(name):
                 continue
             elif _class_name == DIFFUSERS_SD_CLASS_NAME:
                 model_type = ModelType.DIFFUSERS_SD
@@ -311,4 +317,8 @@ def scan_models() -> List[ModelInfo]:
     available_models.extend(scan_single_file_diffusion_models(model_dir))
     available_models.extend(scan_diffusers_models())
     available_models.extend(scan_converted_diffusers_models(model_dir))
-    return available_models
+    return [
+        model
+        for model in available_models
+        if not is_quarantined_model_name(model.name)
+    ]

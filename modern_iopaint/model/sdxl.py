@@ -1,5 +1,3 @@
-import os
-
 import PIL.Image
 import cv2
 import torch
@@ -10,7 +8,7 @@ from modern_iopaint.schema import InpaintRequest, ModelType
 
 from .base import DiffusionInpaintModel
 from .helper.cpu_text_encoder import CPUTextEncoderWrapper
-from .original_sd_configs import get_config_files
+from .original_sd_configs import load_original_config
 from .utils import (
     handle_from_pretrained_exceptions,
     get_torch_dtype,
@@ -27,7 +25,7 @@ class SDXL(DiffusionInpaintModel):
     model_id_or_path = "diffusers/stable-diffusion-xl-1.0-inpainting-0.1"
 
     def init_model(self, device: torch.device, **kwargs):
-        from diffusers.pipelines import StableDiffusionXLInpaintPipeline
+        from diffusers import StableDiffusionXLInpaintPipeline
 
         use_gpu, torch_dtype = get_torch_dtype(device, kwargs.get("no_half", False))
 
@@ -36,22 +34,25 @@ class SDXL(DiffusionInpaintModel):
         else:
             num_in_channels = 9
 
-        if os.path.isfile(self.model_id_or_path):
+        model_kwargs = {
+            **kwargs.get("pipe_components", {}),
+            "local_files_only": is_local_files_only(**kwargs),
+        }
+
+        if self.model_info.is_single_file_diffusers:
             self.model = StableDiffusionXLInpaintPipeline.from_single_file(
                 self.model_id_or_path,
                 torch_dtype=torch_dtype,
                 num_in_channels=num_in_channels,
-                load_safety_checker=False,
-                original_config_file=get_config_files()['xl'],
+                original_config=load_original_config("xl"),
+                **model_kwargs,
             )
         else:
-            model_kwargs = {
-                **kwargs.get("pipe_components", {}),
-                "local_files_only": is_local_files_only(**kwargs),
-            }
             if "vae" not in model_kwargs:
                 vae = AutoencoderKL.from_pretrained(
-                    "madebyollin/sdxl-vae-fp16-fix", torch_dtype=torch_dtype
+                    "madebyollin/sdxl-vae-fp16-fix",
+                    torch_dtype=torch_dtype,
+                    local_files_only=model_kwargs["local_files_only"],
                 )
                 model_kwargs["vae"] = vae
             self.model = handle_from_pretrained_exceptions(

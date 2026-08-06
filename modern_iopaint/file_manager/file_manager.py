@@ -201,10 +201,7 @@ class FileManager:
         return "JPEG"
 
     def _create_thumbnail(self, image, size, crop="fit", background=None):
-        try:
-            resample = Image.Resampling.LANCZOS
-        except AttributeError:  # pylint: disable=raise-missing-from
-            resample = Image.ANTIALIAS
+        resample = Image.Resampling.LANCZOS
 
         if crop == "fit":
             image = ImageOps.fit(image, size, resample)

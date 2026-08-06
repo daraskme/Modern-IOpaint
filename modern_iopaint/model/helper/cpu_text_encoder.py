@@ -1,12 +1,11 @@
 import torch
-from transformers import PreTrainedModel
 
 from ..utils import torch_gc
 
 
-class CPUTextEncoderWrapper(PreTrainedModel):
+class CPUTextEncoderWrapper(torch.nn.Module):
     def __init__(self, text_encoder, torch_dtype):
-        super().__init__(text_encoder.config)
+        super().__init__()
         self.config = text_encoder.config
         self._device = text_encoder.device
         # cpu not support float16
@@ -16,7 +15,7 @@ class CPUTextEncoderWrapper(PreTrainedModel):
         del text_encoder
         torch_gc()
 
-    def __call__(self, x, **kwargs):
+    def forward(self, x, **kwargs):
         input_device = x.device
         original_output = self.text_encoder(x.to(self.text_encoder.device), **kwargs)
         for k, v in original_output.items():

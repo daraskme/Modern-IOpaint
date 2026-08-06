@@ -8,13 +8,9 @@ from loguru import logger
 from modern_iopaint.const import (
     INSTRUCT_PIX2PIX_NAME,
     KANDINSKY22_NAME,
-    POWERPAINT_NAME,
-    ANYTEXT_NAME,
     SDXL_CONTROLNET_CHOICES,
     SD2_CONTROLNET_CHOICES,
     SD_CONTROLNET_CHOICES,
-    SD_BRUSHNET_CHOICES,
-    SDXL_BRUSHNET_CHOICES
 )
 from pydantic import BaseModel, Field, computed_field, model_validator
 
@@ -45,8 +41,6 @@ class ModelInfo(BaseModel):
         ] or self.name in [
             INSTRUCT_PIX2PIX_NAME,
             KANDINSKY22_NAME,
-            POWERPAINT_NAME,
-            ANYTEXT_NAME,
         ]
 
     @computed_field
@@ -62,17 +56,11 @@ class ModelInfo(BaseModel):
                 return SD2_CONTROLNET_CHOICES
             else:
                 return SD_CONTROLNET_CHOICES
-        if self.name == POWERPAINT_NAME:
-            return SD_CONTROLNET_CHOICES
         return []
 
     @computed_field
     @property
     def brushnets(self) -> List[str]:
-        if self.model_type in [ModelType.DIFFUSERS_SD]:
-            return SD_BRUSHNET_CHOICES
-        if self.model_type in [ModelType.DIFFUSERS_SDXL]:
-            return SDXL_BRUSHNET_CHOICES
         return []
 
     @computed_field
@@ -83,7 +71,7 @@ class ModelInfo(BaseModel):
             ModelType.DIFFUSERS_SDXL,
             ModelType.DIFFUSERS_SD_INPAINT,
             ModelType.DIFFUSERS_SDXL_INPAINT,
-        ] or self.name in [POWERPAINT_NAME, ANYTEXT_NAME]
+        ]
 
     @computed_field
     @property
@@ -93,7 +81,7 @@ class ModelInfo(BaseModel):
             ModelType.DIFFUSERS_SDXL,
             ModelType.DIFFUSERS_SD_INPAINT,
             ModelType.DIFFUSERS_SDXL_INPAINT,
-        ] or self.name in [KANDINSKY22_NAME, POWERPAINT_NAME]
+        ] or self.name == KANDINSKY22_NAME
 
     @computed_field
     @property
@@ -118,21 +106,12 @@ class ModelInfo(BaseModel):
     @computed_field
     @property
     def support_brushnet(self) -> bool:
-        return self.model_type in [
-            ModelType.DIFFUSERS_SD,
-            ModelType.DIFFUSERS_SDXL,
-        ]
+        return False
 
     @computed_field
     @property
     def support_powerpaint_v2(self) -> bool:
-        return (
-            self.model_type
-            in [
-                ModelType.DIFFUSERS_SD,
-            ]
-            and self.name != POWERPAINT_NAME
-        )
+        return False
 
 
 class Choices(str, Enum):
@@ -240,14 +219,6 @@ class SDSampler(str, Enum):
     pndm = "PNDM"
     uni_pc = "UniPC"
     lcm = "LCM"
-
-
-class PowerPaintTask(Choices):
-    text_guided = "text-guided"
-    context_aware = "context-aware"
-    shape_guided = "shape-guided"
-    object_remove = "object-remove"
-    outpainting = "outpainting"
 
 
 class ApiConfig(BaseModel):
@@ -399,60 +370,29 @@ class InpaintRequest(BaseModel):
         "lllyasviel/control_v11p_sd15_canny", description="Controlnet method"
     )
 
-    # BrushNet
-    enable_brushnet: bool = Field(False, description="Enable brushnet")
-    brushnet_method: str = Field(SD_BRUSHNET_CHOICES[0], description="Brushnet method")
-    brushnet_conditioning_scale: float = Field(
-        1.0, description="brushnet conditioning scale", ge=0.0, le=1.0
-    )
-
-    # PowerPaint
-    enable_powerpaint_v2: bool = Field(False, description="Enable PowerPaint v2")
-    powerpaint_task: PowerPaintTask = Field(
-        PowerPaintTask.text_guided, description="PowerPaint task"
-    )
-    fitting_degree: float = Field(
-        1.0,
-        description="Control the fitting degree of the generated objects to the mask shape.",
-        gt=0.0,
-        le=1.0,
-    )
-
     @model_validator(mode="after")
-    def validate_field(cls, values: "InpaintRequest"):
-        if values.sd_seed == -1:
-            values.sd_seed = random.randint(1, 99999999)
-            logger.info(f"Generate random seed: {values.sd_seed}")
+    def validate_field(self) -> "InpaintRequest":
+        if self.sd_seed == -1:
+            self.sd_seed = random.randint(1, 99999999)
+            logger.info(f"Generate random seed: {self.sd_seed}")
 
-        if values.use_extender and values.enable_controlnet:
+        if self.use_extender and self.enable_controlnet:
             logger.info("Extender is enabled, set controlnet_conditioning_scale=0")
-            values.controlnet_conditioning_scale = 0
+            self.controlnet_conditioning_scale = 0
 
-        if values.use_extender:
+        if self.use_extender:
             logger.info("Extender is enabled, set sd_strength=1")
-            values.sd_strength = 1.0
+            self.sd_strength = 1.0
 
-        if values.enable_brushnet:
-            logger.info("BrushNet is enabled, set enable_controlnet=False")
-            if values.enable_controlnet:
-                values.enable_controlnet = False
-            if values.sd_lcm_lora:
-                logger.info("BrushNet is enabled, set sd_lcm_lora=False")
-                values.sd_lcm_lora = False
-
-        if values.enable_controlnet:
-            logger.info("ControlNet is enabled, set enable_brushnet=False")
-            if values.enable_brushnet:
-                values.enable_brushnet = False
-
-        return values
+        return self
 
 
 class RunPluginRequest(BaseModel):
     name: str
     image: str = Field(..., description="base64 encoded image")
     clicks: List[List[int]] = Field(
-        [], description="Clicks for interactive seg, [[x,y,0/1], [x2,y2,0/1]]"
+        default_factory=list,
+        description="Clicks for interactive seg, [[x,y,0/1], [x2,y2,0/1]]",
     )
     scale: float = Field(2.0, description="Scale for upscaling")
 

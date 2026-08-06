@@ -48,7 +48,7 @@ def test_controlnet_switch_onoff(caplog):
 def test_switch_controlnet_method(caplog):
     name = "runwayml/stable-diffusion-inpainting"
     old_method = "lllyasviel/control_v11p_sd15_canny"
-    new_method = "lllyasviel/control_v11p_sd15_openpose"
+    new_method = "lllyasviel/control_v11p_sd15_inpaint"
     model = ModelManager(
         name=name,
         enable_controlnet=True,

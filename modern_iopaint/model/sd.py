@@ -5,7 +5,7 @@ from loguru import logger
 
 from .base import DiffusionInpaintModel
 from .helper.cpu_text_encoder import CPUTextEncoderWrapper
-from .original_sd_configs import get_config_files
+from .original_sd_configs import load_original_config
 from .utils import (
     handle_from_pretrained_exceptions,
     get_torch_dtype,
@@ -21,7 +21,7 @@ class SD(DiffusionInpaintModel):
     lcm_lora_id = "latent-consistency/lcm-lora-sdv1-5"
 
     def init_model(self, device: torch.device, **kwargs):
-        from diffusers.pipelines.stable_diffusion import StableDiffusionInpaintPipeline
+        from diffusers import StableDiffusionInpaintPipeline
 
         use_gpu, torch_dtype = get_torch_dtype(device, kwargs.get("no_half", False))
 
@@ -51,8 +51,7 @@ class SD(DiffusionInpaintModel):
             self.model = StableDiffusionInpaintPipeline.from_single_file(
                 self.model_id_or_path,
                 torch_dtype=torch_dtype,
-                load_safety_checker=not disable_nsfw_checker,
-                original_config_file=get_config_files()['v1'],
+                original_config=load_original_config("v1"),
                 **model_kwargs,
             )
         else:

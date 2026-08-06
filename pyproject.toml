@@ -7,7 +7,7 @@ name = "modern-iopaint"
 version = "0.1.0.dev0"
 description = "A modernized fork of IOPaint for image inpainting and outpainting"
 readme = "README.md"
-requires-python = ">=3.11,<3.12"
+requires-python = ">=3.10,<3.14"
 license = { file = "LICENSE" }
 authors = [
   { name = "PanicByte", email = "cwq1913@gmail.com" },
@@ -16,34 +16,35 @@ classifiers = [
   "License :: OSI Approved :: Apache Software License",
   "Operating System :: OS Independent",
   "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
   "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 dependencies = [
-  "torch>=2.0.0",
+  "torch~=2.11.0",
   "opencv-python",
-  "diffusers==0.27.2",
-  "huggingface_hub==0.25.2",
-  "accelerate",
-  "peft==0.7.1",
-  "transformers>=4.39.1",
+  "diffusers==0.39.0",
+  "huggingface_hub==1.26.0",
+  "accelerate==1.14.0",
+  "peft==0.20.0",
+  "transformers==5.14.1",
   "safetensors",
-  "controlnet-aux==0.0.3",
-  "fastapi==0.108.0",
+  "fastapi>=0.141.1,<1",
   "uvicorn",
   "python-multipart",
-  "python-socketio==5.7.2",
-  "typer",
-  "pydantic>=2.5.2",
+  "python-socketio>=5.16.3,<6",
+  "typer>=0.27.1,<1",
+  "pydantic>=2.13.4,<3",
   "rich",
   "loguru",
   "yacs",
   "piexif==1.1.3",
   "omegaconf",
   "easydict",
-  "gradio==4.21.0",
   "typer-config==1.4.0",
-  "Pillow==9.5.0",
+  "Pillow>=10",
 ]
 
 [project.scripts]
@@ -62,8 +63,8 @@ dev = [
 [tool.hatch.build]
 artifacts = [
   "modern_iopaint/web_app/**/*",
-  "modern_iopaint/model/anytext/**/*.txt",
-  "modern_iopaint/model/anytext/**/*.yaml",
+  "modern_iopaint/model/legacy/anytext/**/*.txt",
+  "modern_iopaint/model/legacy/anytext/**/*.yaml",
   "modern_iopaint/model/original_sd_configs/*.yaml",
 ]
 

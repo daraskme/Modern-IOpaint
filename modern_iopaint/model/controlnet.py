@@ -8,12 +8,10 @@ from modern_iopaint.schema import InpaintRequest, ModelType
 from .base import DiffusionInpaintModel
 from .helper.controlnet_preprocess import (
     make_canny_control_image,
-    make_openpose_control_image,
-    make_depth_control_image,
     make_inpaint_control_image,
 )
 from .helper.cpu_text_encoder import CPUTextEncoderWrapper
-from .original_sd_configs import get_config_files
+from .original_sd_configs import load_original_config
 from .utils import (
     get_scheduler,
     handle_from_pretrained_exceptions,
@@ -58,7 +56,11 @@ class ControlNet(DiffusionInpaintModel):
         disable_nsfw_checker = kwargs["disable_nsfw"] or kwargs.get(
             "cpu_offload", False
         )
-        if disable_nsfw_checker:
+        is_sd15_or_sd2 = model_info.model_type in [
+            ModelType.DIFFUSERS_SD,
+            ModelType.DIFFUSERS_SD_INPAINT,
+        ]
+        if disable_nsfw_checker and is_sd15_or_sd2:
             logger.info("Disable Stable Diffusion Model NSFW checker")
             model_kwargs.update(
                 dict(
@@ -71,7 +73,7 @@ class ControlNet(DiffusionInpaintModel):
         use_gpu, torch_dtype = get_torch_dtype(device, kwargs.get("no_half", False))
         self.torch_dtype = torch_dtype
 
-        original_config_file_name = "v1"
+        original_config_name = "v1"
         if model_info.model_type in [
             ModelType.DIFFUSERS_SD,
             ModelType.DIFFUSERS_SD_INPAINT,
@@ -80,7 +82,7 @@ class ControlNet(DiffusionInpaintModel):
                 StableDiffusionControlNetInpaintPipeline as PipeClass,
             )
 
-            original_config_file_name = "v1"
+            original_config_name = "v1"
 
         elif model_info.model_type in [
             ModelType.DIFFUSERS_SDXL,
@@ -90,7 +92,7 @@ class ControlNet(DiffusionInpaintModel):
                 StableDiffusionXLControlNetInpaintPipeline as PipeClass,
             )
 
-            original_config_file_name = "xl"
+            original_config_name = "xl"
 
         controlnet = ControlNetModel.from_pretrained(
             pretrained_model_name_or_path=controlnet_method,
@@ -98,7 +100,10 @@ class ControlNet(DiffusionInpaintModel):
             torch_dtype=self.torch_dtype,
         )
         if model_info.is_single_file_diffusers:
-            if self.model_info.model_type == ModelType.DIFFUSERS_SD:
+            if self.model_info.model_type in [
+                ModelType.DIFFUSERS_SD,
+                ModelType.DIFFUSERS_SDXL,
+            ]:
                 model_kwargs["num_in_channels"] = 4
             else:
                 model_kwargs["num_in_channels"] = 9
@@ -106,9 +111,8 @@ class ControlNet(DiffusionInpaintModel):
             self.model = PipeClass.from_single_file(
                 model_info.path,
                 controlnet=controlnet,
-                load_safety_checker=not disable_nsfw_checker,
                 torch_dtype=torch_dtype,
-                original_config_file=get_config_files()[original_config_file_name],
+                original_config=load_original_config(original_config_name),
                 **model_kwargs,
             )
         else:
@@ -148,14 +152,13 @@ class ControlNet(DiffusionInpaintModel):
     def _get_control_image(self, image, mask):
         if "canny" in self.controlnet_method:
             control_image = make_canny_control_image(image)
-        elif "openpose" in self.controlnet_method:
-            control_image = make_openpose_control_image(image)
-        elif "depth" in self.controlnet_method:
-            control_image = make_depth_control_image(image)
         elif "inpaint" in self.controlnet_method:
             control_image = make_inpaint_control_image(image, mask)
         else:
-            raise NotImplementedError(f"{self.controlnet_method} not implemented")
+            raise ValueError(
+                f"ControlNet preprocessor for {self.controlnet_method!r} is quarantined; "
+                "only Canny and inpaint conditioning are supported in P1"
+            )
         return control_image
 
     def forward(self, image, mask, config: InpaintRequest):

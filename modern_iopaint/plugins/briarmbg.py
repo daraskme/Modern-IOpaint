@@ -474,7 +474,7 @@ def create_briarmbg_session():
     from huggingface_hub import hf_hub_download
 
     net = BriaRMBG()
-    model_path = hf_hub_download("briaai/RMBG-1.4", "model.pth")
+    model_path = hf_hub_download(repo_id="briaai/RMBG-1.4", filename="model.pth")
     net.load_state_dict(torch.load(model_path, map_location="cpu"))
     net.eval()
     return net

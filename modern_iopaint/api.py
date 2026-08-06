@@ -135,14 +135,14 @@ def api_middleware(app: FastAPI):
 global_sio: AsyncServer = None
 
 
-def diffuser_callback(pipe, step: int, timestep: int, callback_kwargs: Dict = {}):
+def diffuser_callback(pipe, step: int, timestep: int, callback_kwargs: Dict):
     # self: DiffusionPipeline, step: int, timestep: int, callback_kwargs: Dict
     # logger.info(f"diffusion callback: step={step}, timestep={timestep}")
 
     # We use asyncio loos for task processing. Perhaps in the future, we can add a processing queue similar to InvokeAI,
     # but for now let's just start a separate event loop. It shouldn't make a difference for single person use
     asyncio.run(global_sio.emit("diffusion_progress", {"step": step}))
-    return {}
+    return callback_kwargs
 
 
 class Api:

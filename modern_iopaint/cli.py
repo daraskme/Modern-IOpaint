@@ -69,7 +69,7 @@ def run(
         "Mask will automatically resize to the same size as the original image.",
     ),
     output: Path = Option(..., help="Output directory or file path"),
-    config: Path = Option(
+    config: Optional[Path] = Option(
         None, help="Config file path. You can use dump command to create a base config."
     ),
     concat: bool = Option(
@@ -228,13 +228,3 @@ def start(
     print(api_config.model_dump_json(indent=4))
     api = Api(app, api_config)
     api.launch()
-
-
-@typer_app.command(help="Start IOPaint web config page")
-def start_web_config(
-    config_file: Path = Option("config.json"),
-):
-    dump_environment_info()
-    from modern_iopaint.web_config import main
-
-    main(config_file)
