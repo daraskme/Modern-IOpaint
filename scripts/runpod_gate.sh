@@ -14,8 +14,8 @@ export PATH=/root/.local/bin:$PATH
 git clone --depth 1 https://github.com/daraskme/Modern-IOpaint.git app
 cd /root/app
 uv venv --python 3.12 .venv
-curl -L -o /root/wheel.whl https://github.com/daraskme/Modern-IOpaint/releases/download/v0.1.0b1/modern_iopaint-0.1.0b1-py3-none-any.whl
-uv pip install --python .venv /root/wheel.whl
+curl -L -o /root/modern_iopaint-0.1.0b1-py3-none-any.whl https://github.com/daraskme/Modern-IOpaint/releases/download/v0.1.0b1/modern_iopaint-0.1.0b1-py3-none-any.whl
+uv pip install --python .venv /root/modern_iopaint-0.1.0b1-py3-none-any.whl
 .venv/bin/modern-iopaint setup-gpu || { echo "SETUP_GPU_FAILED"; touch /srv/FAILED; exit 1; }
 .venv/bin/python -c "from nunchaku.utils import get_precision; print('precision:', get_precision())"
 echo "=== downloading models ==="
