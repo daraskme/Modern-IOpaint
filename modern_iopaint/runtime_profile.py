@@ -112,9 +112,9 @@ def select_runtime_profile(device, override: Optional[str] = None) -> RuntimePro
 
     if requested is RuntimeProfile.auto:
         free_gib = free_vram / GIB
-        if free_gib >= 20.0:
+        if free_gib >= 24.0:
             selected = RuntimeProfile.fast
-        elif free_gib >= 13.0:
+        elif free_gib >= 19.0:
             selected = RuntimeProfile.balanced
         else:
             selected = RuntimeProfile.conservative

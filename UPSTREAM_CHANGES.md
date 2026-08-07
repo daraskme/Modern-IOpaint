@@ -147,10 +147,21 @@ model changes.
 At model-load time, the runtime profiler records free/total VRAM and total
 system RAM, then chooses:
 
-- `fast` at 20 GiB or more free VRAM: model CPU offload;
-- `balanced` from 13 GiB up to 20 GiB: model CPU offload plus VAE tiling;
-- `conservative` below 13 GiB: computed Nunchaku transformer block residency,
+- `fast` at 24 GiB or more free VRAM: model CPU offload;
+- `balanced` from 19 GiB up to 24 GiB: model CPU offload plus VAE tiling;
+- `conservative` below 19 GiB: computed Nunchaku transformer block residency,
   sequential CPU offload, and VAE tiling.
+
+Real-hardware `smoke_p2` stage (b) testing on an RTX A4000 16 GB (Linux,
+int4) failed under the old automatic thresholds: at 15.56 GiB free VRAM, the
+selector chose `balanced`, and Qwen at 1024px OOMed mid-inference after the
+`fast`/`balanced` paths measured about 17.8 GiB peak allocated VRAM. A followup
+call observed 0.89 GiB free and selected `conservative` with one transformer
+block on GPU. The conservative path completed at about 2.95 GiB peak allocated
+VRAM in 22 seconds with int4; the fp4 reference peak is 3.0 GiB. The 19 GiB
+lower boundary keeps 12 GB and 16 GB-class cards on `conservative` and provides
+about 1.2 GiB of headroom over the measured peak before model CPU offload is
+allowed; `balanced` now covers 19 GiB up to 24 GiB, and `fast` starts at 24 GiB.
 
 For the conservative profile, Nunchaku block offload is enabled first, the
 pipeline's exact `transformer` component name is then added to
