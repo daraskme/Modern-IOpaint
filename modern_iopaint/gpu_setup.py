@@ -347,6 +347,48 @@ def _format_version_diagnostics(probe: TorchStackProbe) -> str:
     )
 
 
+def _matches_compatible_release(
+    version: str | None, required_major: int, required_minor: int
+) -> bool:
+    if version is None:
+        return False
+    return (
+        re.fullmatch(
+            rf"{required_major}\.{required_minor}\.\d+(?:\.post\d+)?"
+            r"(?:\+[a-z0-9]+(?:[._-][a-z0-9]+)*)?",
+            version,
+            flags=re.IGNORECASE,
+        )
+        is not None
+    )
+
+
+def _torch_stack_swap_reasons(probe: TorchStackProbe) -> list[str]:
+    reasons: list[str] = []
+    torch_version = probe.torch_version or "not installed/unknown"
+    torchvision_version = probe.torchvision_version or "not installed/unknown"
+    cuda_version = probe.torch_cuda_version or "None"
+
+    if not (
+        (probe.torch_cuda_version or "").startswith("12.8")
+        or "+cu128" in (probe.torch_version or "").lower()
+    ):
+        reasons.append(
+            "torch is not the required CUDA 12.8/cu128 build "
+            f"(torch.version.cuda={cuda_version}, torch={torch_version})"
+        )
+    if not _matches_compatible_release(probe.torch_version, 2, 11):
+        reasons.append(f"torch {torch_version} is outside ~=2.11.0")
+    if not probe.nms_works:
+        reasons.append(
+            "torchvision import/ops.nms execution failed "
+            f"(probe diagnostic: {probe.detail})"
+        )
+    if not _matches_compatible_release(probe.torchvision_version, 0, 26):
+        reasons.append(f"torchvision {torchvision_version} is outside ~=0.26.0")
+    return reasons
+
+
 def _verify_torch_stack(echo: Callable[[str], None]) -> TorchStackProbe:
     probe = _probe_torch_stack()
     versions = _format_version_diagnostics(probe)
@@ -542,9 +584,17 @@ def run_setup_gpu(
     echo(
         "Current torch probe: "
         f"torch {torch_probe.torch_version or 'not installed/unknown'}; "
-        f"{cuda_status}; {torch_probe.detail}"
+        f"torchvision {torch_probe.torchvision_version or 'not installed/unknown'}; "
+        f"{cuda_status}; "
+        f"torchvision.ops.nms={'working' if torch_probe.nms_works else 'failed'}; "
+        f"diagnostic: {torch_probe.detail}"
     )
-    if not torch_probe.is_cuda_build:
+    swap_reasons = _torch_stack_swap_reasons(torch_probe)
+    if swap_reasons:
+        echo(
+            "Torch stack decision: swap to torch~=2.11.0+cu128 and "
+            "torchvision~=0.26.0 because " + "; ".join(swap_reasons) + "."
+        )
         torch_arguments: list[str] = []
         if installer.is_uv:
             torch_arguments.extend(
@@ -571,7 +621,11 @@ def run_setup_gpu(
             echo,
         )
     else:
-        echo("CUDA-enabled torch is already available; leaving it in place.")
+        echo(
+            "Torch stack decision: keep existing stack; CUDA 12.8/cu128, "
+            "torch~=2.11.0, torchvision~=0.26.0, and working "
+            "torchvision.ops.nms requirements are all satisfied."
+        )
 
     if dry_run:
         echo(

@@ -384,6 +384,10 @@ downloads the release assets and records their SHA-256 values. The primary
 `--device` option now defaults to `auto`, selecting CUDA when available and CPU
 otherwise while retaining explicit overrides.
 
+Linux PyPI's default torch is now cu13.0, so `setup-gpu` enforces the cu12.8
+tuple (`torch~=2.11.0+cu128`, `torchvision~=0.26.0`) required by the pinned
+Nunchaku wheels.
+
 `installer/oneclick` provides a double-click batch entry point and an
 idempotent, transcript-logged PowerShell bootstrap. It checks the NVIDIA driver
 and 45 GB disk budget, downloads a version/hash-pinned uv Windows archive,
